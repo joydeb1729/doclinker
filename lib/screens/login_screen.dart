@@ -257,11 +257,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         width: 100,
                         height: 100,
                         decoration: AppTheme.gradientDecoration,
-                        child: const Image(
-                          image: AssetImage(
-                            'assets/images/doclinker_cover2.jpg',
-                          ),
-                          fit: BoxFit.cover,
+                        child: const Icon(
+                          Icons.handshake,
+                          size: 50,
+                          color: Colors.white,
                         ),
                       ),
                     ),
