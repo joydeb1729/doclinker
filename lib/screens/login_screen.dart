@@ -111,15 +111,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
+      print('Starting Google Sign-In from login screen...');
+      
       final auth = ref.read(authProvider);
+      
+      // Check if Google Play Services is available
+      final isPlayServicesAvailable = await auth.isGooglePlayServicesAvailable();
+      if (!isPlayServicesAvailable) {
+        throw Exception('Google Play Services is not available on this device. Please install Google Play Services.');
+      }
+      
+      // Test Google Sign-In configuration
+      final configTest = await auth.testGoogleSignInConfiguration();
+      if (!configTest) {
+        throw Exception('Google Sign-In configuration test failed. Please check your Firebase console settings.');
+      }
+      
+      // Check if Google Sign-In is available
+      final isAvailable = await auth.isGoogleSignInAvailable();
+      if (!isAvailable) {
+        throw Exception('Google Sign-In is not available on this device');
+      }
+      
       final result = await auth.signInWithGoogle();
 
       if (mounted) {
         if (result.success) {
+          print('Google Sign-In successful, navigating to home...');
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         } else {
+          print('Google Sign-In failed: ${result.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result.errorMessage ?? 'Google Sign-in failed'),
@@ -133,6 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     } catch (e) {
+      print('Google Sign-In exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
