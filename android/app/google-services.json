@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "638330305231",
+    "project_id": "doclinker-991da",
+    "storage_bucket": "doclinker-991da.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638330305231:android:7f81e40eee9ac5775255ba",
+        "android_client_info": {
+          "package_name": "com.example.doclinker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "638330305231-vd3qup6krjt0p00g2rph6pso0ibf6p1u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.doclinker",
+            "certificate_hash": "82bf94946782a081950fe81eea3332a47e0ebbc9"
+          }
+        },
+        {
+          "client_id": "638330305231-ud4r1h7rcpao1o6o3u2jckkqd8rijbgk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCv5ABKPo6hnLRbity51csAprnIz6BxnTk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "638330305231-ud4r1h7rcpao1o6o3u2jckkqd8rijbgk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "638330305231-tfpn5p4aj250vdii06u8j06uslifiptk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.doclinker"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
