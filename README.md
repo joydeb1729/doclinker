@@ -71,8 +71,8 @@ lib/
 ```
 
 ## Next Steps
-- [ ] Implement actual Firebase authentication
-- [ ] Create onboarding screens
+- [ ] Implement complete Firebase authentication
 - [ ] Build home screen with document management
 - [ ] Add document linking functionality
+- [ ] Integrate Chatbot (RAG)
 - [ ] Implement user profile and settings
