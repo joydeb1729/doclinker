@@ -378,9 +378,8 @@ class _AssistantPageState extends State<AssistantPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => HospitalSelectorModal(
-        locationController: widget.locationController,
-      ),
+      builder: (context) =>
+          HospitalSelectorModal(locationController: widget.locationController),
     ).then((_) {
       // Force UI update when returning from the hospital selector
       setState(() {
@@ -709,6 +708,9 @@ class _AssistantPageState extends State<AssistantPage> {
                                 fontSize: isSmallScreen ? 12 : 14,
                               ),
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
                               contentPadding: EdgeInsets.symmetric(vertical: 8),
                               isDense: true,
                             ),
