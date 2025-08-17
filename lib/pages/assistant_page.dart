@@ -378,9 +378,15 @@ class _AssistantPageState extends State<AssistantPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) =>
-          HospitalSelectorModal(locationController: widget.locationController),
-    );
+      builder: (context) => HospitalSelectorModal(
+        locationController: widget.locationController,
+      ),
+    ).then((_) {
+      // Force UI update when returning from the hospital selector
+      setState(() {
+        // Just triggering a rebuild to refresh the hospital name
+      });
+    });
   }
 
   void _scrollToBottom() {
@@ -402,177 +408,239 @@ class _AssistantPageState extends State<AssistantPage> {
 
     return Column(
       children: [
-        // Compact AI Progress Tracker
+        // Ultra-compact top bar with mode toggle and optional context
         Container(
-          padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 8 : 12,
+            vertical: isSmallScreen ? 4 : 6,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
           child: Column(
             children: [
-              // Mode Toggle
+              // Mode toggle as a segmented control
               Container(
-                margin: EdgeInsets.only(bottom: isSmallScreen ? 8 : 12),
-                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                height: isSmallScreen ? 28 : 32,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.textLight.withOpacity(0.2),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Simple Chat Mode Button
-                    GestureDetector(
-                      onTap: () => _toggleChatMode(ChatMode.simpleChat),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 12 : 16,
-                          vertical: isSmallScreen ? 6 : 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _currentMode == ChatMode.simpleChat
-                              ? AppTheme.primaryColor
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: isSmallScreen ? 14 : 16,
-                              color: _currentMode == ChatMode.simpleChat
-                                  ? Colors.white
-                                  : AppTheme.textSecondary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Chat',
-                              style: TextStyle(
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _toggleChatMode(ChatMode.simpleChat),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _currentMode == ChatMode.simpleChat
+                                ? AppTheme.primaryColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                size: isSmallScreen ? 12 : 14,
                                 color: _currentMode == ChatMode.simpleChat
                                     ? Colors.white
                                     : AppTheme.textSecondary,
-                                fontWeight: FontWeight.w500,
-                                fontSize: isSmallScreen ? 12 : 14,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 4),
+                              Text(
+                                'Chat',
+                                style: TextStyle(
+                                  color: _currentMode == ChatMode.simpleChat
+                                      ? Colors.white
+                                      : AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: isSmallScreen ? 10 : 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                     // Doctor Matching Mode Button
-                    GestureDetector(
-                      onTap: () => _toggleChatMode(ChatMode.doctorMatching),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 12 : 16,
-                          vertical: isSmallScreen ? 6 : 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _currentMode == ChatMode.doctorMatching
-                              ? AppTheme.primaryColor
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.medical_services_outlined,
-                              size: isSmallScreen ? 14 : 16,
-                              color: _currentMode == ChatMode.doctorMatching
-                                  ? Colors.white
-                                  : AppTheme.textSecondary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Find Doctor',
-                              style: TextStyle(
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _toggleChatMode(ChatMode.doctorMatching),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _currentMode == ChatMode.doctorMatching
+                                ? AppTheme.primaryColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.medical_services_outlined,
+                                size: isSmallScreen ? 12 : 14,
                                 color: _currentMode == ChatMode.doctorMatching
                                     ? Colors.white
                                     : AppTheme.textSecondary,
-                                fontWeight: FontWeight.w500,
-                                fontSize: isSmallScreen ? 12 : 14,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 4),
+                              Text(
+                                'Find Doctor',
+                                style: TextStyle(
+                                  color: _currentMode == ChatMode.doctorMatching
+                                      ? Colors.white
+                                      : AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: isSmallScreen ? 10 : 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // Only show progress tracker in doctor matching mode
+
+              // Location/Hospital button (only in doctor matching mode)
               if (_currentMode == ChatMode.doctorMatching)
-                AIProgressTracker(
-                  currentStage: _currentStage,
-                  showLabels: !isSmallScreen, // Hide labels on small screens
+                Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    onTap: _showHospitalSelector,
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8 : 10,
+                        vertical: isSmallScreen ? 4 : 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: isSmallScreen ? 12 : 14,
+                            color: AppTheme.accentColor,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            widget.locationController
+                                .getLocationContext()
+                                .split(',')[0],
+                            style: TextStyle(
+                              color: AppTheme.accentColor,
+                              fontWeight: FontWeight.w500,
+                              fontSize: isSmallScreen ? 10 : 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
         ),
 
-        // Hospital Selector (only in doctor matching mode)
-        if (_currentMode == ChatMode.doctorMatching)
-          HospitalSelector(
-            locationController: widget.locationController,
-            onTap: _showHospitalSelector,
-          ),
-
-        // Compact Context Summary (if symptoms are mentioned and in doctor matching mode)
-        if (_currentSymptom.isNotEmpty &&
-            _currentMode == ChatMode.doctorMatching)
+        // Mini progress indicator for doctor matching mode
+        if (_currentMode == ChatMode.doctorMatching &&
+            _currentSymptom.isNotEmpty)
           Container(
-            margin: EdgeInsets.symmetric(
+            padding: EdgeInsets.symmetric(
               horizontal: isSmallScreen ? 12 : 16,
               vertical: isSmallScreen ? 4 : 6,
             ),
-            padding: EdgeInsets.all(isSmallScreen ? 8 : 10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppTheme.primaryColor.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
+            color: AppTheme.backgroundColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: isSmallScreen ? 14 : 16,
-                  color: AppTheme.primaryColor,
+                // Mini progress tracker
+                AIProgressTracker(
+                  currentStage: _currentStage,
+                  showLabels: false, // Always hide labels to save space
                 ),
-                SizedBox(width: isSmallScreen ? 6 : 8),
-                Expanded(
-                  child: Text(
-                    'Analyzing: $_currentSymptom',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w500,
-                      fontSize: isSmallScreen ? 11 : 12,
+
+                // Mini symptom indicator
+                if (_currentSymptom.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 6 : 8,
+                        vertical: isSmallScreen ? 2 : 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: isSmallScreen ? 10 : 12,
+                            color: AppTheme.primaryColor,
+                          ),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Analyzing: $_currentSymptom',
+                              style: TextStyle(
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w500,
+                                fontSize: isSmallScreen ? 9 : 10,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
               ],
             ),
           ),
 
-        // Chat messages - Give more space
+        // Chat messages - Maximize space
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
-            padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 8 : 12,
+              vertical: isSmallScreen ? 6 : 10,
+            ),
             itemCount: _messages.length + (_isTyping ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == _messages.length) {
                 return AIThinkingIndicator(
-                  message:
-                      "Analyzing your symptoms and finding the best doctors...",
+                  message: _currentMode == ChatMode.doctorMatching
+                      ? "Analyzing your symptoms and finding the best doctors..."
+                      : "Thinking...",
                   showDots: true,
                 );
               }
@@ -581,94 +649,136 @@ class _AssistantPageState extends State<AssistantPage> {
           ),
         ),
 
-        // Compact Input area with AI Avatar
+        // Streamlined input area
         Container(
-          padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 8 : 12,
+            vertical: isSmallScreen ? 6 : 8,
+          ),
           decoration: BoxDecoration(
             color: AppTheme.surfaceColor,
-            boxShadow: AppTheme.cardShadow,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 2,
+                offset: Offset(0, -1),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              // AI Avatar - Smaller on small screens
+              // AI Avatar - even smaller for minimal design
               AIAvatar(
                 state: _aiState,
-                size: isSmallScreen ? 32 : 40,
+                size: isSmallScreen ? 28 : 32,
                 onTap: () {
                   // AI avatar tap action
                 },
               ),
 
-              SizedBox(width: isSmallScreen ? 8 : 12),
+              SizedBox(width: isSmallScreen ? 6 : 8),
 
-              // Text input
+              // Text input - clean, minimal design
               Expanded(
                 child: Container(
+                  height: isSmallScreen ? 36 : 40,
                   decoration: BoxDecoration(
                     color: AppTheme.backgroundColor,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppTheme.textLight.withOpacity(0.3),
+                      color: AppTheme.textLight.withOpacity(0.2),
                       width: 1,
                     ),
                   ),
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: _currentMode == ChatMode.doctorMatching
-                          ? 'Describe your symptoms...'
-                          : 'Type your message...',
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 12 : 16,
-                        vertical: isSmallScreen ? 8 : 12,
+                  child: Row(
+                    children: [
+                      // Text field
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            left: isSmallScreen ? 12 : 14,
+                          ),
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: InputDecoration(
+                              hintText: _currentMode == ChatMode.doctorMatching
+                                  ? 'Describe your symptoms...'
+                                  : 'Type your message...',
+                              hintStyle: TextStyle(
+                                color: AppTheme.textLight,
+                                fontSize: isSmallScreen ? 12 : 14,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              isDense: true,
+                            ),
+                            style: TextStyle(fontSize: isSmallScreen ? 13 : 15),
+                            maxLines: 1,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _sendMessage(),
+                          ),
+                        ),
                       ),
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-              ),
 
-              SizedBox(width: isSmallScreen ? 8 : 12),
+                      // Voice button
+                      Container(
+                        margin: EdgeInsets.only(right: 2),
+                        child: EnhancedVoiceButton(
+                          state: _voiceState,
+                          size: isSmallScreen ? 28 : 30,
+                          onTap: () {
+                            setState(() {
+                              _voiceState = VoiceButtonState.listening;
+                            });
 
-              // Enhanced Voice Button - Smaller on small screens
-              EnhancedVoiceButton(
-                state: _voiceState,
-                size: isSmallScreen ? 36 : 48,
-                onTap: () {
-                  setState(() {
-                    _voiceState = VoiceButtonState.listening;
-                  });
-
-                  // Simulate voice processing
-                  Future.delayed(const Duration(seconds: 2), () {
-                    setState(() {
-                      _voiceState = VoiceButtonState.idle;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Voice input coming soon!'),
-                        duration: Duration(seconds: 2),
+                            // Simulate voice processing
+                            Future.delayed(const Duration(seconds: 2), () {
+                              setState(() {
+                                _voiceState = VoiceButtonState.idle;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Voice input coming soon!'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            });
+                          },
+                        ),
                       ),
-                    );
-                  });
-                },
-              ),
 
-              SizedBox(width: isSmallScreen ? 8 : 12),
-
-              // Send button - Smaller on small screens
-              GestureDetector(
-                onTap: _sendMessage,
-                child: Container(
-                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                  decoration: AppTheme.buttonDecoration,
-                  child: Icon(
-                    Icons.send,
-                    color: Colors.white,
-                    size: isSmallScreen ? 16 : 20,
+                      // Send button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _sendMessage,
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(20),
+                            bottomRight: Radius.circular(20),
+                          ),
+                          child: Container(
+                            height: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 10 : 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(20),
+                                bottomRight: Radius.circular(20),
+                              ),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.send,
+                                color: Colors.white,
+                                size: isSmallScreen ? 14 : 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
