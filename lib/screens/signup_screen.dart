@@ -92,8 +92,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         _nameController.text.trim(),
       );
 
+      print(
+        'SignUp result: success=${result.success}, error=${result.errorMessage}',
+      );
+
       if (mounted) {
         if (result.success) {
+          print('Signup successful, showing success message and navigating...');
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -111,6 +116,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
           );
         } else {
+          print('Signup failed: ${result.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result.errorMessage ?? 'Sign up failed'),
@@ -124,6 +130,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         }
       }
     } catch (e) {
+      print('SignUp exception caught: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
