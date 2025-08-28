@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
+import '../providers/auth_provider.dart';
+import '../screens/login_screen.dart';
+import '../utils/safe_provider_access.dart';
 import 'top_bar.dart';
 import 'bottom_nav_bar.dart';
 
-class MainLayout extends StatefulWidget {
+class MainLayout extends ConsumerStatefulWidget {
   final List<Widget> pages;
 
-  const MainLayout({
-    super.key,
-    required this.pages,
-  });
+  const MainLayout({super.key, required this.pages});
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends ConsumerState<MainLayout>
+    with SafeNavigationMixin {
   int _currentIndex = 0;
 
   @override
@@ -39,10 +41,7 @@ class _MainLayoutState extends State<MainLayout> {
         showNotificationBadge: true, // You can make this dynamic
         showProfileBadge: false, // You can make this dynamic
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: widget.pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: widget.pages),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -76,7 +75,7 @@ class _MainLayoutState extends State<MainLayout> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            
+
             // Profile header
             Padding(
               padding: const EdgeInsets.all(20),
@@ -102,16 +101,14 @@ class _MainLayoutState extends State<MainLayout> {
                       children: [
                         Text(
                           'John Doe',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'john.doe@email.com',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -119,16 +116,16 @@ class _MainLayoutState extends State<MainLayout> {
                 ],
               ),
             ),
-            
+
             // Menu items
             _buildMenuItem(
               icon: Icons.person_outline,
               title: 'Edit Profile',
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit Profile')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Edit Profile')));
               },
             ),
             _buildMenuItem(
@@ -136,9 +133,9 @@ class _MainLayoutState extends State<MainLayout> {
               title: 'Settings',
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Settings')));
               },
             ),
             _buildMenuItem(
@@ -146,9 +143,9 @@ class _MainLayoutState extends State<MainLayout> {
               title: 'Help & Support',
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Help & Support')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Help & Support')));
               },
             ),
             _buildMenuItem(
@@ -156,12 +153,10 @@ class _MainLayoutState extends State<MainLayout> {
               title: 'Sign Out',
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sign Out')),
-                );
+                _showSignOutDialog();
               },
             ),
-            
+
             const SizedBox(height: 20),
           ],
         ),
@@ -180,4 +175,139 @@ class _MainLayoutState extends State<MainLayout> {
       onTap: onTap,
     );
   }
-} 
+
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => _performSignOut(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                ),
+              ),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performSignOut() async {
+    try {
+      // Close the dialog first
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show loading indicator
+      if (mounted) {
+        safeShowDialog(
+          (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Perform sign out - use safer ref access
+      final auth = safeRead(authProvider);
+      if (auth == null) {
+        // Handle the case where auth provider couldn't be accessed
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+        safeShowSnackBar(
+          SnackBar(
+            content: const Text('Authentication error occurred'),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+          ),
+        );
+        return;
+      }
+
+      final result = await auth.signOut();
+
+      // Close loading indicator
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      if (result.success) {
+        // Use safe navigation for better reliability
+        safeNavigate(() {
+          // Navigate to login screen and clear the navigation stack
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+          );
+
+          // Show success message
+          safeShowSnackBar(
+            SnackBar(
+              content: const Text('Successfully signed out'),
+              backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+              ),
+            ),
+          );
+        });
+      } else {
+        // Show error message
+        safeShowSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage ?? 'Sign out failed'),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading indicator if open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      // Show error message with more context
+      debugPrint('Sign out error: $e');
+      safeShowSnackBar(
+        SnackBar(
+          content: Text('Sign out failed: Authentication error'),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          ),
+        ),
+      );
+    }
+  }
+}

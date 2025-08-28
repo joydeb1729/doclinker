@@ -21,10 +21,7 @@ class AuthResult {
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [
-      'email',
-      'profile',
-    ],
+    scopes: ['email', 'profile'],
     // Let it use the default client ID from google-services.json
   );
 
@@ -32,11 +29,11 @@ class AuthService {
   Future<bool> testGoogleSignInConfiguration() async {
     try {
       print('Testing Google Sign-In configuration...');
-      
+
       // Try to get the current user without signing in
       final currentUser = await _googleSignIn.signInSilently();
       print('Current Google user: ${currentUser?.email ?? 'None'}');
-      
+
       return true;
     } catch (e) {
       print('Google Sign-In configuration test failed: $e');
@@ -83,16 +80,41 @@ class AuthService {
     String password,
   ) async {
     try {
+      print('Attempting to sign in with email: $email');
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      return AuthResult.success(userCredential.user!);
+      print('Firebase signIn successful, user: ${userCredential.user?.email}');
+
+      // Add null check and safer user access
+      final user = userCredential.user;
+      if (user != null) {
+        print('User authenticated successfully: ${user.uid}');
+        return AuthResult.success(user);
+      } else {
+        print('User is null after successful authentication');
+        return AuthResult.failure('Authentication failed - user is null');
+      }
     } on FirebaseAuthException catch (e) {
+      print('FirebaseAuthException caught: ${e.code} - ${e.message}');
       String errorMessage = _getErrorMessage(e.code);
       return AuthResult.failure(errorMessage);
     } catch (e) {
+      print('Unexpected exception caught during login: $e');
+      print('Exception type: ${e.runtimeType}');
+
+      // If authentication succeeded but we got an error in processing,
+      // check if user is actually signed in
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        print(
+          'User is actually signed in despite exception: ${currentUser.email}',
+        );
+        return AuthResult.success(currentUser);
+      }
+
       return AuthResult.failure(
         'An unexpected error occurred. Please try again.',
       );
@@ -106,21 +128,33 @@ class AuthService {
     String displayName,
   ) async {
     try {
+      print('Attempting to create user with email: $email');
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
+      print(
+        'Firebase createUser successful, user: ${userCredential.user?.email}',
+      );
+
       // Update user display name
       if (userCredential.user != null) {
+        print('Updating display name to: $displayName');
         await userCredential.user!.updateDisplayName(displayName.trim());
+        print('Display name updated successfully');
       }
 
       return AuthResult.success(userCredential.user!);
     } on FirebaseAuthException catch (e) {
+      print(
+        'FirebaseAuthException caught during signup: ${e.code} - ${e.message}',
+      );
       String errorMessage = _getErrorMessage(e.code);
       return AuthResult.failure(errorMessage);
     } catch (e) {
+      print('Unexpected exception caught during signup: $e');
+      print('Exception type: ${e.runtimeType}');
       return AuthResult.failure(
         'An unexpected error occurred. Please try again.',
       );
@@ -131,7 +165,7 @@ class AuthService {
   Future<AuthResult> loginWithGoogle() async {
     try {
       print('Starting Google Sign-In process...');
-      
+
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
@@ -143,8 +177,9 @@ class AuthService {
       print('Google Sign-In successful for user: ${googleUser.email}');
 
       // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
       print('Google authentication tokens obtained');
 
       // Create a new credential
@@ -158,12 +193,16 @@ class AuthService {
       // Sign in to Firebase with the credential
       final userCredential = await _auth.signInWithCredential(credential);
 
-      print('Firebase authentication successful for user: ${userCredential.user?.uid}');
+      print(
+        'Firebase authentication successful for user: ${userCredential.user?.uid}',
+      );
 
       // Check if user is null
       if (userCredential.user == null) {
         print('Firebase authentication succeeded but user is null');
-        return AuthResult.failure('Authentication succeeded but user data is missing. Please try again.');
+        return AuthResult.failure(
+          'Authentication succeeded but user data is missing. Please try again.',
+        );
       }
 
       return AuthResult.success(userCredential.user!);
@@ -173,29 +212,36 @@ class AuthService {
       return AuthResult.failure(errorMessage);
     } catch (e) {
       print('Google Sign-In Exception: $e');
-      
+
       // Handle specific Google Sign-In errors
       if (e.toString().contains('ApiException: 10')) {
         return AuthResult.failure(
           'Google Sign-In configuration error. Please check your Firebase console settings and ensure Google Sign-In is enabled.',
         );
       }
-      
+
       // Handle type casting errors - if Firebase auth succeeded, treat as success
-      if (e.toString().contains('PigeonUserDetails') || e.toString().contains('type cast')) {
-        print('Type casting error detected, but Firebase authentication likely succeeded');
+      if (e.toString().contains('PigeonUserDetails') ||
+          e.toString().contains('type cast')) {
+        print(
+          'Type casting error detected, but Firebase authentication likely succeeded',
+        );
         // Check if we have a current user despite the error
         final currentUser = _auth.currentUser;
         if (currentUser != null) {
-          print('Found current user despite type casting error: ${currentUser.uid}');
+          print(
+            'Found current user despite type casting error: ${currentUser.uid}',
+          );
           return AuthResult.success(currentUser);
         }
         return AuthResult.failure(
           'Google Sign-In completed successfully, but there was an issue processing user details. Please try again.',
         );
       }
-      
-      return AuthResult.failure('Google sign-in failed. Please try again. Error: $e');
+
+      return AuthResult.failure(
+        'Google sign-in failed. Please try again. Error: $e',
+      );
     }
   }
 
@@ -217,10 +263,36 @@ class AuthService {
   // Logout
   Future<AuthResult> logout() async {
     try {
-      await _googleSignIn.signOut();
+      print('Starting logout process...');
+
+      // Check if user is signed in with Google
+      final isGoogleSignedIn = await _googleSignIn.isSignedIn();
+      print('Google Sign-In status: $isGoogleSignedIn');
+
+      if (isGoogleSignedIn) {
+        print('Signing out from Google...');
+        await _googleSignIn.signOut();
+        print('Google sign out successful');
+      }
+
+      // Sign out from Firebase
+      print('Signing out from Firebase...');
       await _auth.signOut();
-      return AuthResult.success(null);
+      print('Firebase sign out successful');
+
+      // Verify sign out was successful
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('Logout successful - no current user');
+        return AuthResult.success(null);
+      } else {
+        print(
+          'Logout may have failed - user still exists: ${currentUser.email}',
+        );
+        return AuthResult.failure('Logout may not have completed properly');
+      }
     } catch (e) {
+      print('Logout failed with error: $e');
       return AuthResult.failure('Logout failed. Please try again.');
     }
   }
