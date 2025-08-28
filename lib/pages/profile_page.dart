@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
+import '../providers/auth_provider.dart';
+import '../screens/login_screen.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
-    
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       child: Column(
@@ -26,7 +29,9 @@ class ProfilePage extends StatelessWidget {
                   height: isSmallScreen ? 64 : 80,
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(isSmallScreen ? 32 : 40),
+                    borderRadius: BorderRadius.circular(
+                      isSmallScreen ? 32 : 40,
+                    ),
                     border: Border.all(
                       color: AppTheme.primaryColor.withOpacity(0.2),
                       width: 2,
@@ -39,7 +44,7 @@ class ProfilePage extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: isSmallScreen ? 12 : 16),
-                
+
                 // User Info
                 Text(
                   'John Doe',
@@ -78,9 +83,9 @@ class ProfilePage extends StatelessWidget {
               ],
             ),
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           // Quick Stats
           Row(
             children: [
@@ -118,9 +123,9 @@ class ProfilePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           // Menu Items
           _buildMenuSection(
             context,
@@ -152,9 +157,9 @@ class ProfilePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           _buildMenuSection(
             context,
             title: 'Health',
@@ -185,9 +190,9 @@ class ProfilePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           _buildMenuSection(
             context,
             title: 'Support',
@@ -218,42 +223,45 @@ class ProfilePage extends StatelessWidget {
               ),
             ],
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           // Logout Button
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
-            decoration: BoxDecoration(
-              color: AppTheme.errorColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              border: Border.all(
-                color: AppTheme.errorColor.withOpacity(0.2),
-                width: 1,
+          GestureDetector(
+            onTap: () => _showSignOutDialog(context, ref),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 14 : 16),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                border: Border.all(
+                  color: AppTheme.errorColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.logout,
+                    color: AppTheme.errorColor,
+                    size: isSmallScreen ? 18 : 20,
+                  ),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Text(
+                    'Sign Out',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppTheme.errorColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: isSmallScreen ? 14 : 16,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.logout,
-                  color: AppTheme.errorColor,
-                  size: isSmallScreen ? 18 : 20,
-                ),
-                SizedBox(width: isSmallScreen ? 6 : 8),
-                Text(
-                  'Sign Out',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppTheme.errorColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: isSmallScreen ? 14 : 16,
-                  ),
-                ),
-              ],
-            ),
           ),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 20),
         ],
       ),
@@ -273,11 +281,7 @@ class ProfilePage extends StatelessWidget {
       decoration: AppTheme.cardDecoration,
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: isSmallScreen ? 20 : 24,
-          ),
+          Icon(icon, color: color, size: isSmallScreen ? 20 : 24),
           SizedBox(height: isSmallScreen ? 6 : 8),
           Text(
             value,
@@ -310,7 +314,7 @@ class ProfilePage extends StatelessWidget {
   }) {
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -412,4 +416,111 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
-} 
+
+  void _showSignOutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => _performSignOut(context, ref),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                ),
+              ),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performSignOut(BuildContext context, WidgetRef ref) async {
+    try {
+      // Close the dialog first
+      Navigator.of(context).pop();
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Perform sign out
+      final auth = ref.read(authProvider);
+      final result = await auth.signOut();
+
+      // Close loading indicator
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (result.success) {
+        // Navigate to login screen and clear the navigation stack
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Successfully signed out'),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage ?? 'Sign out failed'),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading indicator if open
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sign out failed: ${e.toString()}'),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          ),
+        ),
+      );
+    }
+  }
+}
