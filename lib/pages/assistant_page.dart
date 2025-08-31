@@ -8,6 +8,7 @@ import '../widgets/enhanced_chat_bubble.dart';
 import '../widgets/enhanced_voice_button.dart';
 import '../widgets/hospital_selector.dart';
 import '../controllers/location_controller.dart';
+import '../services/chat_service.dart';
 
 class AssistantPage extends StatefulWidget {
   final LocationController locationController;
@@ -46,7 +47,7 @@ class _AssistantPageState extends State<AssistantPage> {
 
     if (_currentMode == ChatMode.doctorMatching) {
       welcomeText =
-          "Hello! I'm your AI health assistant. Please describe your symptoms and I'll help you find the right doctor.";
+          "Hello! I'm your AI health assistant powered by advanced language models. Please describe your symptoms and I'll help you find the right doctor.";
       suggestions = [
         AISuggestionChip(
           text: "I have a headache",
@@ -66,7 +67,7 @@ class _AssistantPageState extends State<AssistantPage> {
       ];
     } else {
       welcomeText =
-          "Hello! I'm your AI health assistant. How can I help you today?";
+          "Hello! I'm your AI health assistant powered by advanced language models. How can I help you today?";
       suggestions = [
         AISuggestionChip(
           text: "Health tips",
@@ -131,235 +132,257 @@ class _AssistantPageState extends State<AssistantPage> {
     });
   }
 
-  void _generateAIResponse(String userMessage) {
+  void _generateAIResponse(String userMessage) async {
     setState(() {
       _isTyping = false;
       _aiState = AIState.responding;
 
       if (_currentMode == ChatMode.doctorMatching) {
         _currentStage = AIProgressStage.doctorMatching;
-
-        // Get location context for AI response
-        final locationContext = widget.locationController.getLocationContext();
-
-        // Simulate AI analysis and doctor suggestions
-        if (userMessage.toLowerCase().contains('headache') ||
-            userMessage.toLowerCase().contains('head pain')) {
-          _messages.add(
-            ChatMessage(
-              text:
-                  "I understand you're experiencing headache symptoms. Based on your description and location context ($locationContext), I recommend consulting with a neurologist or general physician. Here are some specialists in your area:",
-              isUser: false,
-              timestamp: DateTime.now(),
-              doctorSuggestions: [
-                DoctorSuggestion(
-                  name: "Dr. Sarah Johnson",
-                  specialty: "Neurologist",
-                  rating: 4.8,
-                  distance: "2.3 km",
-                  availability: "Tomorrow 2:00 PM",
-                ),
-                DoctorSuggestion(
-                  name: "Dr. Michael Chen",
-                  specialty: "General Physician",
-                  rating: 4.6,
-                  distance: "1.8 km",
-                  availability: "Today 4:30 PM",
-                ),
-              ],
-              suggestions: [
-                AISuggestionChip(
-                  text: "Book with Dr. Johnson",
-                  icon: Icons.calendar_today,
-                  onTap: () =>
-                      _sendQuickMessage("Book appointment with Dr. Johnson"),
-                ),
-                AISuggestionChip(
-                  text: "Find more specialists",
-                  icon: Icons.search,
-                  onTap: () => _sendQuickMessage("Show me more neurologists"),
-                ),
-              ],
-            ),
-          );
-        } else if (userMessage.toLowerCase().contains('fever') ||
-            userMessage.toLowerCase().contains('temperature')) {
-          _messages.add(
-            ChatMessage(
-              text:
-                  "I see you're experiencing fever symptoms. This could be due to various causes. Based on your location ($locationContext), I recommend seeing a general physician or infectious disease specialist. Here are some options:",
-              isUser: false,
-              timestamp: DateTime.now(),
-              doctorSuggestions: [
-                DoctorSuggestion(
-                  name: "Dr. Emily Davis",
-                  specialty: "General Physician",
-                  rating: 4.7,
-                  distance: "1.2 km",
-                  availability: "Today 3:00 PM",
-                ),
-                DoctorSuggestion(
-                  name: "Dr. Robert Wilson",
-                  specialty: "Infectious Disease",
-                  rating: 4.9,
-                  distance: "3.1 km",
-                  availability: "Tomorrow 10:00 AM",
-                ),
-              ],
-              suggestions: [
-                AISuggestionChip(
-                  text: "Book with Dr. Davis",
-                  icon: Icons.calendar_today,
-                  onTap: () =>
-                      _sendQuickMessage("Book appointment with Dr. Davis"),
-                ),
-                AISuggestionChip(
-                  text: "Get urgent care",
-                  icon: Icons.emergency,
-                  onTap: () => _sendQuickMessage("I need urgent care"),
-                ),
-              ],
-            ),
-          );
-        } else if (userMessage.toLowerCase().contains('chest pain') ||
-            userMessage.toLowerCase().contains('heart')) {
-          _messages.add(
-            ChatMessage(
-              text:
-                  "Chest pain is a serious symptom that requires immediate attention. Based on your location ($locationContext), I strongly recommend seeing a cardiologist or visiting urgent care. Here are some specialists:",
-              isUser: false,
-              timestamp: DateTime.now(),
-              doctorSuggestions: [
-                DoctorSuggestion(
-                  name: "Dr. Lisa Martinez",
-                  specialty: "Cardiologist",
-                  rating: 4.9,
-                  distance: "2.8 km",
-                  availability: "Today 5:00 PM",
-                ),
-                DoctorSuggestion(
-                  name: "Dr. James Thompson",
-                  specialty: "Emergency Medicine",
-                  rating: 4.8,
-                  distance: "1.5 km",
-                  availability: "Immediate",
-                ),
-              ],
-              suggestions: [
-                AISuggestionChip(
-                  text: "Urgent care now",
-                  icon: Icons.emergency,
-                  onTap: () =>
-                      _sendQuickMessage("I need urgent care immediately"),
-                ),
-                AISuggestionChip(
-                  text: "Book cardiologist",
-                  icon: Icons.calendar_today,
-                  onTap: () => _sendQuickMessage("Book with cardiologist"),
-                ),
-              ],
-            ),
-          );
-        } else {
-          // Generic response for doctor matching mode
-          _messages.add(
-            ChatMessage(
-              text:
-                  "I understand your symptoms. Based on your location ($locationContext), I can help you find the right specialist. Could you please provide more details about your symptoms?",
-              isUser: false,
-              timestamp: DateTime.now(),
-              suggestions: [
-                AISuggestionChip(
-                  text: "Find nearby doctors",
-                  icon: Icons.search,
-                  onTap: () => _sendQuickMessage("Find nearby doctors"),
-                ),
-                AISuggestionChip(
-                  text: "Change location",
-                  icon: Icons.location_on,
-                  onTap: () => _showHospitalSelector(),
-                ),
-              ],
-            ),
-          );
-        }
-
-        _currentStage = AIProgressStage.completed;
-      } else {
-        // Simple chat mode responses
-        if (userMessage.toLowerCase().contains('health tips') ||
-            userMessage.toLowerCase().contains('advice')) {
-          _messages.add(
-            ChatMessage(
-              text:
-                  "Here are some general health tips:\n\n1. Stay hydrated by drinking at least 8 glasses of water daily\n2. Aim for 7-8 hours of quality sleep each night\n3. Include fruits and vegetables in every meal\n4. Exercise for at least 30 minutes daily\n5. Practice mindfulness or meditation to reduce stress",
-              isUser: false,
-              timestamp: DateTime.now(),
-              suggestions: [
-                AISuggestionChip(
-                  text: "Exercise tips",
-                  icon: Icons.fitness_center,
-                  onTap: () => _sendQuickMessage("Give me exercise tips"),
-                ),
-                AISuggestionChip(
-                  text: "Nutrition advice",
-                  icon: Icons.restaurant_menu,
-                  onTap: () => _sendQuickMessage("Nutrition advice"),
-                ),
-              ],
-            ),
-          );
-        } else if (userMessage.toLowerCase().contains('doclinker') ||
-            userMessage.toLowerCase().contains('about')) {
-          _messages.add(
-            ChatMessage(
-              text:
-                  "DocLinker is an AI-powered healthcare platform that connects patients with the right doctors based on their symptoms and medical needs. Our intelligent matching system analyzes your symptoms and finds the most suitable healthcare providers in your area.",
-              isUser: false,
-              timestamp: DateTime.now(),
-              suggestions: [
-                AISuggestionChip(
-                  text: "Find a doctor",
-                  icon: Icons.search,
-                  onTap: () => _toggleChatMode(ChatMode.doctorMatching),
-                ),
-                AISuggestionChip(
-                  text: "Health tips",
-                  icon: Icons.health_and_safety,
-                  onTap: () => _sendQuickMessage("Give me some health tips"),
-                ),
-              ],
-            ),
-          );
-        } else {
-          // Generic simple chat response
-          _messages.add(
-            ChatMessage(
-              text:
-                  "I'm here to provide general health information and answer your questions. If you'd like to find a doctor based on your symptoms, you can switch to doctor matching mode.",
-              isUser: false,
-              timestamp: DateTime.now(),
-              suggestions: [
-                AISuggestionChip(
-                  text: "Switch to doctor matching",
-                  icon: Icons.medical_services,
-                  onTap: () => _toggleChatMode(ChatMode.doctorMatching),
-                ),
-                AISuggestionChip(
-                  text: "Health tips",
-                  icon: Icons.health_and_safety,
-                  onTap: () => _sendQuickMessage("Give me some health tips"),
-                ),
-              ],
-            ),
-          );
-        }
       }
-
-      _aiState = AIState.idle;
     });
 
+    try {
+      // Get AI response from backend API
+      String aiResponse = await ChatService.sendMessage(userMessage);
+
+      setState(() {
+        if (_currentMode == ChatMode.doctorMatching) {
+          // Get location context for enhanced response
+          final locationContext = widget.locationController
+              .getLocationContext();
+
+          // Add location context to the AI response
+          String enhancedResponse =
+              "$aiResponse\n\nBased on your location ($locationContext), here are some nearby healthcare providers:";
+
+          _messages.add(
+            ChatMessage(
+              text: enhancedResponse,
+              isUser: false,
+              timestamp: DateTime.now(),
+              doctorSuggestions: _getDoctorSuggestions(userMessage),
+              suggestions: _getSuggestions(userMessage, _currentMode),
+            ),
+          );
+
+          _currentStage = AIProgressStage.completed;
+        } else {
+          // Simple chat mode - just show the AI response
+          _messages.add(
+            ChatMessage(
+              text: aiResponse,
+              isUser: false,
+              timestamp: DateTime.now(),
+              suggestions: _getSuggestions(userMessage, _currentMode),
+            ),
+          );
+        }
+
+        _aiState = AIState.idle;
+      });
+    } catch (e) {
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text:
+                "I'm sorry, I'm having trouble connecting to my AI services right now. Please check your internet connection and make sure the backend server is running on http://10.0.2.2:8000",
+            isUser: false,
+            timestamp: DateTime.now(),
+            suggestions: [
+              AISuggestionChip(
+                text: "Try again",
+                icon: Icons.refresh,
+                onTap: () => _generateAIResponse(userMessage),
+              ),
+              AISuggestionChip(
+                text: "Check API health",
+                icon: Icons.wifi,
+                onTap: () => _checkApiHealth(),
+              ),
+            ],
+          ),
+        );
+        _aiState = AIState.idle;
+      });
+    }
+
     _scrollToBottom();
+  }
+
+  // Helper method to check API health
+  void _checkApiHealth() async {
+    bool isHealthy = await ChatService.checkApiHealth();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isHealthy
+                ? 'AI service is online and ready!'
+                : 'AI service is offline. Using fallback responses.',
+          ),
+          backgroundColor: isHealthy ? Colors.green : Colors.orange,
+        ),
+      );
+    }
+  }
+
+  // Helper method to get doctor suggestions based on symptoms
+  List<DoctorSuggestion> _getDoctorSuggestions(String userMessage) {
+    final lowerMessage = userMessage.toLowerCase();
+
+    if (lowerMessage.contains('headache') ||
+        lowerMessage.contains('head pain') ||
+        lowerMessage.contains('migraine')) {
+      return [
+        DoctorSuggestion(
+          name: "Dr. Sarah Johnson",
+          specialty: "Neurologist",
+          rating: 4.8,
+          distance: "2.3 km",
+          availability: "Tomorrow 2:00 PM",
+        ),
+        DoctorSuggestion(
+          name: "Dr. Michael Chen",
+          specialty: "General Physician",
+          rating: 4.6,
+          distance: "1.8 km",
+          availability: "Today 4:30 PM",
+        ),
+      ];
+    } else if (lowerMessage.contains('fever') ||
+        lowerMessage.contains('temperature') ||
+        lowerMessage.contains('cold')) {
+      return [
+        DoctorSuggestion(
+          name: "Dr. Emily Davis",
+          specialty: "General Physician",
+          rating: 4.7,
+          distance: "1.2 km",
+          availability: "Today 3:00 PM",
+        ),
+        DoctorSuggestion(
+          name: "Dr. Robert Wilson",
+          specialty: "Infectious Disease",
+          rating: 4.9,
+          distance: "3.1 km",
+          availability: "Tomorrow 10:00 AM",
+        ),
+      ];
+    } else if (lowerMessage.contains('chest pain') ||
+        lowerMessage.contains('heart') ||
+        lowerMessage.contains('cardiac')) {
+      return [
+        DoctorSuggestion(
+          name: "Dr. Lisa Martinez",
+          specialty: "Cardiologist",
+          rating: 4.9,
+          distance: "2.8 km",
+          availability: "Today 5:00 PM",
+        ),
+        DoctorSuggestion(
+          name: "Dr. James Thompson",
+          specialty: "Emergency Medicine",
+          rating: 4.8,
+          distance: "1.5 km",
+          availability: "Immediate",
+        ),
+      ];
+    }
+    return [];
+  }
+
+  // Helper method to get suggestion chips based on context
+  List<Widget> _getSuggestions(String userMessage, ChatMode mode) {
+    final lowerMessage = userMessage.toLowerCase();
+
+    if (mode == ChatMode.doctorMatching) {
+      if (lowerMessage.contains('headache') ||
+          lowerMessage.contains('migraine')) {
+        return [
+          AISuggestionChip(
+            text: "Book with Dr. Johnson",
+            icon: Icons.calendar_today,
+            onTap: () => _sendQuickMessage("Book appointment with Dr. Johnson"),
+          ),
+          AISuggestionChip(
+            text: "Find more specialists",
+            icon: Icons.search,
+            onTap: () => _sendQuickMessage("Show me more neurologists"),
+          ),
+        ];
+      } else if (lowerMessage.contains('fever') ||
+          lowerMessage.contains('cold')) {
+        return [
+          AISuggestionChip(
+            text: "Book with Dr. Davis",
+            icon: Icons.calendar_today,
+            onTap: () => _sendQuickMessage("Book appointment with Dr. Davis"),
+          ),
+          AISuggestionChip(
+            text: "Get urgent care",
+            icon: Icons.emergency,
+            onTap: () => _sendQuickMessage("I need urgent care"),
+          ),
+        ];
+      } else if (lowerMessage.contains('chest pain') ||
+          lowerMessage.contains('heart')) {
+        return [
+          AISuggestionChip(
+            text: "Urgent care now",
+            icon: Icons.emergency,
+            onTap: () => _sendQuickMessage("I need urgent care immediately"),
+          ),
+          AISuggestionChip(
+            text: "Book cardiologist",
+            icon: Icons.calendar_today,
+            onTap: () => _sendQuickMessage("Book with cardiologist"),
+          ),
+        ];
+      } else {
+        return [
+          AISuggestionChip(
+            text: "Find nearby doctors",
+            icon: Icons.search,
+            onTap: () => _sendQuickMessage("Find nearby doctors"),
+          ),
+          AISuggestionChip(
+            text: "Change location",
+            icon: Icons.location_on,
+            onTap: () => _showHospitalSelector(),
+          ),
+        ];
+      }
+    } else {
+      // Simple chat mode suggestions
+      if (lowerMessage.contains('doclinker')) {
+        return [
+          AISuggestionChip(
+            text: "Find a doctor",
+            icon: Icons.search,
+            onTap: () => _toggleChatMode(ChatMode.doctorMatching),
+          ),
+          AISuggestionChip(
+            text: "Health tips",
+            icon: Icons.health_and_safety,
+            onTap: () => _sendQuickMessage("Give me some health tips"),
+          ),
+        ];
+      } else {
+        return [
+          AISuggestionChip(
+            text: "Switch to doctor matching",
+            icon: Icons.medical_services,
+            onTap: () => _toggleChatMode(ChatMode.doctorMatching),
+          ),
+          AISuggestionChip(
+            text: "Health tips",
+            icon: Icons.health_and_safety,
+            onTap: () => _sendQuickMessage("Give me some health tips"),
+          ),
+        ];
+      }
+    }
   }
 
   void _toggleChatMode(ChatMode newMode) {
