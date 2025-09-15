@@ -8,6 +8,9 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/doctor/doctor_dashboard.dart';
+import 'screens/doctor/doctor_profile_screen.dart';
+import 'screens/doctor_list_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -35,6 +38,9 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignUpScreen(),
         '/profile-setup': (context) => const ProfileSetupScreen(),
         '/home': (context) => const HomeScreen(),
+        '/doctor-dashboard': (context) => const DoctorDashboard(),
+        '/doctor-profile': (context) => const DoctorProfileScreen(),
+        '/doctors': (context) => const DoctorListScreen(),
       },
     );
   }
