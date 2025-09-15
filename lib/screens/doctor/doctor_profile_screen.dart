@@ -413,8 +413,18 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         TextFormField(
           controller: _feeController,
           decoration: const InputDecoration(
-            labelText: 'Consultation Fee (\$)',
-            prefixIcon: Icon(Icons.attach_money),
+            labelText: 'Consultation Fee (\৳)',
+            prefixIcon: const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: Text(
+                '৳', // Unicode Taka symbol
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
           ),
           keyboardType: TextInputType.number,
         ),
@@ -436,7 +446,12 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               specialization,
             );
             return FilterChip(
-              label: Text(specialization),
+              label: Text(
+                specialization,
+                style: const TextStyle(
+                  color: Colors.black, // ✅ unselected text is black
+                ),
+              ),
               selected: isSelected,
               onSelected: (selected) {
                 setState(() {
@@ -449,6 +464,12 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               },
               selectedColor: AppTheme.primaryColor.withOpacity(0.2),
               checkmarkColor: AppTheme.primaryColor,
+              labelStyle: TextStyle(
+                color: isSelected
+                    ? AppTheme
+                          .primaryColor // ✅ selected text color
+                    : Colors.black, // ✅ unselected text color
+              ),
             );
           }).toList(),
         ),
@@ -538,7 +559,11 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           children: [
             Text(
               day,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: Colors.black, // ✅ ensure day name is black
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -554,10 +579,17 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 return FilterChip(
                   label: Text(
                     slot,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: isSelected ? AppTheme.primaryColor : null,
+                      color: Colors.black, // ✅ unselected stays black
                     ),
+                  ),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    color: isSelected
+                        ? AppTheme
+                              .primaryColor // ✅ selected text
+                        : Colors.black, // ✅ unselected text
                   ),
                   selected: isSelected,
                   onSelected: (selected) {
