@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../services/navigation_service.dart';
 import 'signup_screen.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -69,10 +69,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 
       if (mounted) {
-        if (result.success) {
-          print('Login successful, navigating to home screen...');
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+        if (result.success && result.user != null) {
+          print('Login successful, navigating based on user role...');
+          await NavigationService.navigateBasedOnRole(
+            context,
+            result.user!.uid,
           );
         } else {
           print('Login failed: ${result.errorMessage}');
@@ -148,10 +149,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final result = await auth.signInWithGoogle();
 
       if (mounted) {
-        if (result.success) {
-          print('Google Sign-In successful, navigating to home...');
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+        if (result.success && result.user != null) {
+          print('Google Sign-In successful, navigating based on user role...');
+          await NavigationService.navigateBasedOnRole(
+            context,
+            result.user!.uid,
           );
         } else {
           print('Google Sign-In failed: ${result.errorMessage}');

@@ -22,6 +22,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isDoctor = false;
 
   @override
   void dispose() {
@@ -90,6 +91,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         _emailController.text.trim(),
         _passwordController.text,
         _nameController.text.trim(),
+        isDoctor: _isDoctor,
       );
 
       print(
@@ -111,10 +113,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             ),
           );
 
-          // Navigate to profile setup
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
-          );
+          // Navigate based on role
+          if (_isDoctor) {
+            Navigator.of(context).pushReplacementNamed('/doctor-profile');
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const ProfileSetupScreen(),
+              ),
+            );
+          }
         } else {
           print('Signup failed: ${result.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -337,6 +345,145 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       obscureText: _obscureConfirmPassword,
                       validator: _validateConfirmPassword,
                       enabled: !_isLoading,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Role selection
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select Your Role',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _isDoctor = false),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: !_isDoctor
+                                          ? AppTheme.primaryColor.withOpacity(
+                                              0.1,
+                                            )
+                                          : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: !_isDoctor
+                                            ? AppTheme.primaryColor
+                                            : Colors.grey.shade300,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.person,
+                                          size: 32,
+                                          color: !_isDoctor
+                                              ? AppTheme.primaryColor
+                                              : Colors.grey,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Patient',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: !_isDoctor
+                                                ? AppTheme.primaryColor
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Find doctors & book appointments',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: !_isDoctor
+                                                ? AppTheme.primaryColor
+                                                      .withOpacity(0.7)
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _isDoctor = true),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: _isDoctor
+                                          ? AppTheme.primaryColor.withOpacity(
+                                              0.1,
+                                            )
+                                          : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _isDoctor
+                                            ? AppTheme.primaryColor
+                                            : Colors.grey.shade300,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.local_hospital,
+                                          size: 32,
+                                          color: _isDoctor
+                                              ? AppTheme.primaryColor
+                                              : Colors.grey,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Doctor',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: _isDoctor
+                                                ? AppTheme.primaryColor
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Manage patients & appointments',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _isDoctor
+                                                ? AppTheme.primaryColor
+                                                      .withOpacity(0.7)
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 24),

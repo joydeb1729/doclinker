@@ -52,9 +52,15 @@ class AuthProvider {
   Future<AuthResult> createUserWithEmailAndPassword(
     String email,
     String password,
-    String displayName,
-  ) async {
-    return await _authService.signUpWithEmailAndPassword(email, password, displayName);
+    String displayName, {
+    bool isDoctor = false,
+  }) async {
+    return await _authService.signUpWithEmailAndPassword(
+      email,
+      password,
+      displayName,
+      isDoctor: isDoctor,
+    );
   }
 
   // Google Sign-in
@@ -83,8 +89,14 @@ class AuthProvider {
   }
 
   // Update user profile
-  Future<AuthResult> updateUserProfile({String? displayName, String? photoURL}) async {
-    return await _authService.updateUserProfile(displayName: displayName, photoURL: photoURL);
+  Future<AuthResult> updateUserProfile({
+    String? displayName,
+    String? photoURL,
+  }) async {
+    return await _authService.updateUserProfile(
+      displayName: displayName,
+      photoURL: photoURL,
+    );
   }
 
   // Get user profile
@@ -104,4 +116,4 @@ class AuthProvider {
   Future<AuthResult> mockLogin() async {
     return await _authService.mockLogin();
   }
-} 
+}

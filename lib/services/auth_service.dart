@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/doctor_profile.dart';
 
 // Custom result class for authentication operations
 class AuthResult {
@@ -125,8 +127,9 @@ class AuthService {
   Future<AuthResult> signUpWithEmailAndPassword(
     String email,
     String password,
-    String displayName,
-  ) async {
+    String displayName, {
+    bool isDoctor = false,
+  }) async {
     try {
       print('Attempting to create user with email: $email');
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -143,6 +146,9 @@ class AuthService {
         print('Updating display name to: $displayName');
         await userCredential.user!.updateDisplayName(displayName.trim());
         print('Display name updated successfully');
+
+        // Create user document in Firestore
+        await _createUserDocument(userCredential.user!, displayName, isDoctor);
       }
 
       return AuthResult.success(userCredential.user!);
@@ -384,6 +390,104 @@ class AuthService {
       return AuthResult.success(null);
     } catch (e) {
       return AuthResult.failure('Mock login failed');
+    }
+  }
+
+  // Create user document in Firestore
+  Future<void> _createUserDocument(
+    User user,
+    String displayName,
+    bool isDoctor,
+  ) async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+      // Create user document in 'users' collection
+      await firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email,
+        'name':
+            displayName, // Changed from 'displayName' to 'name' to match your Firestore structure
+        'isDoctor': isDoctor,
+        'createdAt': FieldValue.serverTimestamp(),
+        'profileComplete': false,
+      });
+
+      print('User document created successfully for ${user.email}');
+
+      // If user is a doctor, create initial doctor profile
+      if (isDoctor) {
+        await _createInitialDoctorProfile(user, displayName);
+      }
+    } catch (e) {
+      print('Error creating user document: $e');
+      throw Exception('Failed to create user profile');
+    }
+  }
+
+  // Create initial doctor profile document
+  Future<void> _createInitialDoctorProfile(
+    User user,
+    String displayName,
+  ) async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+      final doctorProfile = DoctorProfile(
+        uid: user.uid,
+        email: user.email ?? '',
+        fullName: displayName,
+        medicalLicense: '', // To be filled during profile setup
+        specializations: [], // To be filled during profile setup
+        hospitalAffiliation: '', // To be filled during profile setup
+        yearsOfExperience: 0,
+        medicalDegree: '', // To be filled during profile setup
+        clinicAddress: '', // To be filled during profile setup
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await firestore
+          .collection('doctor_profiles')
+          .doc(user.uid)
+          .set(doctorProfile.toFirestore());
+
+      print('Initial doctor profile created successfully for ${user.email}');
+    } catch (e) {
+      print('Error creating doctor profile: $e');
+      throw Exception('Failed to create doctor profile');
+    }
+  }
+
+  // Check if user is a doctor
+  Future<bool> isDoctorUser(String uid) async {
+    try {
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final userDoc = await firestore.collection('users').doc(uid).get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        final isDoctor = data?['isDoctor'] ?? false;
+        print('Checking doctor status for $uid: isDoctor = $isDoctor');
+        print('User data: $data');
+        return isDoctor;
+      }
+      print('User document does not exist for $uid');
+      return false;
+    } catch (e) {
+      print('Error checking doctor status: $e');
+      return false;
+    }
+  }
+
+  // Get user role
+  Future<String> getUserRole(String uid) async {
+    try {
+      final bool isDoctor = await isDoctorUser(uid);
+      return isDoctor ? 'doctor' : 'user';
+    } catch (e) {
+      print('Error getting user role: $e');
+      return 'user';
     }
   }
 }

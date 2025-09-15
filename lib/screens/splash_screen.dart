@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../services/navigation_service.dart';
 import 'onboarding_screen.dart';
-import 'home_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -62,8 +62,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final user = authState.value;
 
       if (user != null) {
-        // User is logged in, navigate to home
-        _navigateToHome();
+        // User is logged in, navigate based on role
+        await NavigationService.navigateBasedOnRole(context, user.uid);
       } else {
         // User is not logged in, navigate to onboarding
         _navigateToOnboarding();
@@ -73,12 +73,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       print('Auth check failed: $e');
       _navigateToOnboarding();
     }
-  }
-
-  void _navigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
   }
 
   void _navigateToOnboarding() {
