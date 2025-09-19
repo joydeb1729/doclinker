@@ -93,7 +93,7 @@ class Appointment {
       doctorName: data['doctorName'] ?? '',
       patientName: data['patientName'] ?? '',
       appointmentDate:
-          (data['appointmentDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          _safeParseTimestamp(data['appointmentDate']) ?? DateTime.now(),
       timeSlot: data['timeSlot'] ?? '',
       type: AppointmentType.values.firstWhere(
         (e) => e.name == data['type'],
@@ -110,8 +110,8 @@ class Appointment {
       notes: data['notes'],
       fee: (data['fee'] ?? 0.0).toDouble(),
       isPaid: data['isPaid'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _safeParseTimestamp(data['createdAt']) ?? DateTime.now(),
+      updatedAt: _safeParseTimestamp(data['updatedAt']) ?? DateTime.now(),
       patientPhone: data['patientPhone'],
       doctorPhone: data['doctorPhone'],
     );
@@ -210,6 +210,37 @@ class Appointment {
         (status == AppointmentStatus.pending ||
             status == AppointmentStatus.confirmed);
   }
+
+  // Safe parsing of Firestore Timestamps
+  static DateTime? _safeParseTimestamp(dynamic value) {
+    try {
+      if (value == null) {
+        return null;
+      }
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      if (value is DateTime) {
+        return value;
+      }
+      if (value is String) {
+        // Try to parse ISO string format
+        return DateTime.tryParse(value);
+      }
+      if (value is int) {
+        // Treat as milliseconds since epoch
+        return DateTime.fromMillisecondsSinceEpoch(value);
+      }
+      // If none of the above, return null
+      print('Warning: Unexpected timestamp type: ${value.runtimeType}');
+      return null;
+    } catch (e) {
+      print(
+        'Error parsing timestamp: $e, value: $value, type: ${value.runtimeType}',
+      );
+      return null;
+    }
+  }
 }
 
 // Appointment Service for Firestore operations
@@ -217,13 +248,55 @@ class AppointmentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'appointments';
 
-  // Create appointment
-  Future<void> createAppointment(Appointment appointment) async {
+  // Create appointment with transaction safety
+  Future<String> createAppointment(Appointment appointment) async {
     try {
-      await _firestore
-          .collection(_collection)
-          .doc(appointment.id)
-          .set(appointment.toFirestore());
+      final docRef = _firestore.collection(_collection).doc();
+
+      return await _firestore.runTransaction((transaction) async {
+        // Check for existing appointments at the same time slot
+        final existingQuery = await _firestore
+            .collection(_collection)
+            .where('doctorId', isEqualTo: appointment.doctorId)
+            .where(
+              'appointmentDate',
+              isEqualTo: Timestamp.fromDate(appointment.appointmentDate),
+            )
+            .where('timeSlot', isEqualTo: appointment.timeSlot)
+            .where('status', whereIn: ['pending', 'confirmed'])
+            .get();
+
+        if (existingQuery.docs.isNotEmpty) {
+          throw Exception('Time slot is already booked');
+        }
+
+        // Create the appointment with the generated ID
+        final appointmentWithId = Appointment(
+          id: docRef.id,
+          doctorId: appointment.doctorId,
+          patientId: appointment.patientId,
+          doctorName: appointment.doctorName,
+          patientName: appointment.patientName,
+          appointmentDate: appointment.appointmentDate,
+          timeSlot: appointment.timeSlot,
+          type: appointment.type,
+          status: appointment.status,
+          reason: appointment.reason,
+          symptoms: appointment.symptoms,
+          diagnosis: appointment.diagnosis,
+          prescription: appointment.prescription,
+          notes: appointment.notes,
+          fee: appointment.fee,
+          isPaid: appointment.isPaid,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          patientPhone: appointment.patientPhone,
+          doctorPhone: appointment.doctorPhone,
+        );
+
+        transaction.set(docRef, appointmentWithId.toFirestore());
+        return docRef.id;
+      });
     } catch (e) {
       throw Exception('Failed to create appointment: $e');
     }
@@ -372,13 +445,23 @@ class AppointmentService {
   // Update appointment status
   Future<void> updateAppointmentStatus(
     String appointmentId,
-    AppointmentStatus status,
-  ) async {
+    AppointmentStatus status, {
+    String? notes,
+  }) async {
     try {
-      await _firestore.collection(_collection).doc(appointmentId).update({
+      final updateData = {
         'status': status.name,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (notes != null) {
+        updateData['notes'] = notes;
+      }
+
+      await _firestore
+          .collection(_collection)
+          .doc(appointmentId)
+          .update(updateData);
     } catch (e) {
       throw Exception('Failed to update appointment status: $e');
     }
