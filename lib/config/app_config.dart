@@ -2,15 +2,15 @@
 class AppConfig {
   // HuggingFace API configuration
   // Get your free API key from: https://huggingface.co/settings/tokens
-  static const String huggingFaceApiKey =
-      "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";
+  static const String huggingFaceApiKey = "'YOUR_HF_API_KEY_HERE'";
+  //"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";
   static const String huggingFaceBaseUrl =
       'https://api-inference.huggingface.co';
 
   // Groq API configuration
   // Get your free API key from: https://console.groq.com/keys
-  static const String groqApiKey =
-      "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";
+  static const String groqApiKey = 'YOUR_GROQ_API_KEY_HERE';
+  //"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";
   static const String groqBaseUrl = 'https://api.groq.com/openai/v1';
 
   // Chat model configurations
