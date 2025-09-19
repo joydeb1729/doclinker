@@ -9,6 +9,7 @@ import '../widgets/enhanced_voice_button.dart';
 import '../widgets/hospital_selector.dart';
 import '../controllers/location_controller.dart';
 import '../services/chat_service.dart';
+import '../services/doctor_matching_service.dart';
 
 class AssistantPage extends StatefulWidget {
   final LocationController locationController;
@@ -25,30 +26,61 @@ enum ChatMode { simpleChat, doctorMatching }
 class _AssistantPageState extends State<AssistantPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
+
+  // Separate message lists for each mode
+  final List<ChatMessage> _chatMessages = [];
+  final List<ChatMessage> _doctorMatchingMessages = [];
+
   bool _isTyping = false;
   AIState _aiState = AIState.idle;
   VoiceButtonState _voiceState = VoiceButtonState.idle;
   AIProgressStage _currentStage = AIProgressStage.symptomAnalysis;
   String _currentSymptom = '';
-  ChatMode _currentMode =
-      ChatMode.doctorMatching; // Default to doctor matching mode
+  ChatMode _currentMode = ChatMode.simpleChat; // Default to simple chat mode
+
+  // Get current messages based on active mode
+  List<ChatMessage> get _messages {
+    return _currentMode == ChatMode.simpleChat
+        ? _chatMessages
+        : _doctorMatchingMessages;
+  }
 
   @override
   void initState() {
     super.initState();
-    // Add welcome message based on current mode
-    _addWelcomeMessage();
+    // Initialize welcome messages for both modes
+    _initializeWelcomeMessages();
   }
 
-  void _addWelcomeMessage() {
-    String welcomeText;
-    List<Widget> suggestions;
+  void _initializeWelcomeMessages() {
+    // Add welcome message for simple chat mode
+    final chatWelcomeMessage = ChatMessage(
+      text:
+          "Hello! I'm your AI health assistant powered by advanced language models. How can I help you today?",
+      isUser: false,
+      timestamp: DateTime.now(),
+      suggestions: [
+        AISuggestionChip(
+          text: "Health tips",
+          icon: Icons.health_and_safety,
+          onTap: () => _sendQuickMessage("Give me some health tips"),
+        ),
+        AISuggestionChip(
+          text: "About DocLinker",
+          icon: Icons.info,
+          onTap: () => _sendQuickMessage("Tell me about DocLinker"),
+        ),
+      ],
+    );
+    _chatMessages.add(chatWelcomeMessage);
 
-    if (_currentMode == ChatMode.doctorMatching) {
-      welcomeText =
-          "Hello! I'm your AI health assistant powered by advanced language models. Please describe your symptoms and I'll help you find the right doctor.";
-      suggestions = [
+    // Add welcome message for doctor matching mode
+    final doctorWelcomeMessage = ChatMessage(
+      text:
+          "Hello! I'm your AI health assistant powered by advanced language models. Please describe your symptoms and I'll help you find the right doctor.",
+      isUser: false,
+      timestamp: DateTime.now(),
+      suggestions: [
         AISuggestionChip(
           text: "I have a headache",
           icon: Icons.sick,
@@ -64,32 +96,12 @@ class _AssistantPageState extends State<AssistantPage> {
           icon: Icons.favorite,
           onTap: () => _sendQuickMessage("I have chest pain"),
         ),
-      ];
-    } else {
-      welcomeText =
-          "Hello! I'm your AI health assistant powered by advanced language models. How can I help you today?";
-      suggestions = [
-        AISuggestionChip(
-          text: "Health tips",
-          icon: Icons.health_and_safety,
-          onTap: () => _sendQuickMessage("Give me some health tips"),
-        ),
-        AISuggestionChip(
-          text: "About DocLinker",
-          icon: Icons.info,
-          onTap: () => _sendQuickMessage("Tell me about DocLinker"),
-        ),
-      ];
-    }
-
-    _messages.add(
-      ChatMessage(
-        text: welcomeText,
-        isUser: false,
-        timestamp: DateTime.now(),
-        suggestions: suggestions,
-      ),
+      ],
     );
+    _doctorMatchingMessages.add(doctorWelcomeMessage);
+
+    // Set default mode (simple chat)
+    _currentMode = ChatMode.simpleChat;
   }
 
   @override
@@ -108,11 +120,20 @@ class _AssistantPageState extends State<AssistantPage> {
     if (_messageController.text.trim().isEmpty) return;
 
     final userMessage = _messageController.text.trim();
+    final userMessageObj = ChatMessage(
+      text: userMessage,
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
 
     setState(() {
-      _messages.add(
-        ChatMessage(text: userMessage, isUser: true, timestamp: DateTime.now()),
-      );
+      // Add to the appropriate message list
+      if (_currentMode == ChatMode.simpleChat) {
+        _chatMessages.add(userMessageObj);
+      } else {
+        _doctorMatchingMessages.add(userMessageObj);
+      }
+
       _isTyping = true;
       _aiState = AIState.thinking;
 
@@ -143,71 +164,429 @@ class _AssistantPageState extends State<AssistantPage> {
     });
 
     try {
-      // Get AI response from backend API
-      String aiResponse = await ChatService.sendMessage(userMessage);
-
-      setState(() {
-        if (_currentMode == ChatMode.doctorMatching) {
-          // Get location context for enhanced response
-          final locationContext = widget.locationController
-              .getLocationContext();
-
-          // Add location context to the AI response
-          String enhancedResponse =
-              "$aiResponse\n\nBased on your location ($locationContext), here are some nearby healthcare providers:";
-
-          _messages.add(
-            ChatMessage(
-              text: enhancedResponse,
-              isUser: false,
-              timestamp: DateTime.now(),
-              doctorSuggestions: _getDoctorSuggestions(userMessage),
-              suggestions: _getSuggestions(userMessage, _currentMode),
-            ),
-          );
-
-          _currentStage = AIProgressStage.completed;
-        } else {
-          // Simple chat mode - just show the AI response
-          _messages.add(
-            ChatMessage(
-              text: aiResponse,
-              isUser: false,
-              timestamp: DateTime.now(),
-              suggestions: _getSuggestions(userMessage, _currentMode),
-            ),
-          );
-        }
-
-        _aiState = AIState.idle;
-      });
+      if (_currentMode == ChatMode.doctorMatching) {
+        // RAG-based doctor matching workflow
+        await _handleDoctorMatching(userMessage);
+      } else {
+        // Simple chat mode - use regular AI response
+        await _handleSimpleChat(userMessage);
+      }
     } catch (e) {
       setState(() {
-        _messages.add(
-          ChatMessage(
-            text:
-                "I'm sorry, I'm having trouble connecting to my AI services right now. Please check your internet connection and make sure the backend server is running on http://10.0.2.2:8000",
-            isUser: false,
-            timestamp: DateTime.now(),
-            suggestions: [
-              AISuggestionChip(
-                text: "Try again",
-                icon: Icons.refresh,
-                onTap: () => _generateAIResponse(userMessage),
-              ),
-              AISuggestionChip(
-                text: "Check API health",
-                icon: Icons.wifi,
-                onTap: () => _checkApiHealth(),
-              ),
-            ],
-          ),
+        final errorMessage = ChatMessage(
+          text:
+              "I'm sorry, I'm having trouble processing your request right now. Please try again or check your connection.",
+          isUser: false,
+          timestamp: DateTime.now(),
+          suggestions: [
+            AISuggestionChip(
+              text: "Try again",
+              icon: Icons.refresh,
+              onTap: () => _generateAIResponse(userMessage),
+            ),
+            AISuggestionChip(
+              text: "Check connection",
+              icon: Icons.wifi,
+              onTap: () => _checkApiHealth(),
+            ),
+          ],
         );
+
+        // Add to appropriate message list
+        if (_currentMode == ChatMode.simpleChat) {
+          _chatMessages.add(errorMessage);
+        } else {
+          _doctorMatchingMessages.add(errorMessage);
+        }
+
         _aiState = AIState.idle;
       });
     }
 
     _scrollToBottom();
+  }
+
+  // RAG-based doctor matching workflow
+  Future<void> _handleDoctorMatching(String userMessage) async {
+    try {
+      // Step 1: Analyze symptoms and get specialty recommendations
+      setState(() {
+        _currentStage = AIProgressStage.symptomAnalysis;
+      });
+
+      final specialtyRecommendation =
+          await DoctorMatchingService.analyzeSymptomsAndSuggestSpecialties(
+            userMessage,
+          );
+
+      // Step 2: Show the specialty explanation to user
+      setState(() {
+        final explanationMessage = ChatMessage(
+          text: specialtyRecommendation.explanation,
+          isUser: false,
+          timestamp: DateTime.now(),
+        );
+        _doctorMatchingMessages.add(explanationMessage);
+      });
+
+      // Brief pause to let user read the explanation
+      await Future.delayed(Duration(milliseconds: 1500));
+
+      // Step 3: Show loading message while searching for doctors
+      setState(() {
+        _currentStage = AIProgressStage.doctorMatching;
+        final loadingMessage = ChatMessage(
+          text: "Finding Best Doctor For You...",
+          isUser: false,
+          timestamp: DateTime.now(),
+          isLoading: true,
+        );
+        _doctorMatchingMessages.add(loadingMessage);
+      });
+
+      // Step 4: Search for doctors by specialties
+      final locationContext = widget.locationController.getLocationContext();
+      final matchingResult =
+          await DoctorMatchingService.findDoctorsBySpecialties(
+            specialties: specialtyRecommendation.specialties,
+            location: locationContext,
+            originalQuery: userMessage,
+            maxResults: 3,
+          );
+
+      // Step 5: Generate doctor results response
+      String aiResponse = _generateDoctorResultsResponse(
+        specialtyRecommendation,
+        matchingResult,
+      );
+
+      setState(() {
+        // Remove the loading message
+        _doctorMatchingMessages.removeLast();
+
+        // Add the final results
+        final aiResponseMessage = ChatMessage(
+          text: aiResponse,
+          isUser: false,
+          timestamp: DateTime.now(),
+          doctorSuggestions: _convertToLegacyDoctorSuggestions(
+            matchingResult.matchedDoctors,
+          ),
+          suggestions: _getDoctorMatchingSuggestions(matchingResult),
+        );
+
+        _doctorMatchingMessages.add(aiResponseMessage);
+        _currentStage = AIProgressStage.completed;
+        _aiState = AIState.idle;
+      });
+    } catch (e) {
+      setState(() {
+        // Remove loading message if it exists
+        if (_doctorMatchingMessages.isNotEmpty &&
+            _doctorMatchingMessages.last.text ==
+                "Finding Best Doctor For You...") {
+          _doctorMatchingMessages.removeLast();
+        }
+
+        final errorMessage = ChatMessage(
+          text:
+              "Sorry, I couldn't find matching doctors right now. This could be due to network issues or temporary service problems. Please try again.",
+          isUser: false,
+          timestamp: DateTime.now(),
+        );
+        _doctorMatchingMessages.add(errorMessage);
+        _currentStage = AIProgressStage.completed;
+        _aiState = AIState.idle;
+      });
+      throw Exception('Doctor matching failed: $e');
+    }
+  }
+
+  // Simple chat workflow
+  Future<void> _handleSimpleChat(String userMessage) async {
+    try {
+      String aiResponse = await ChatService.sendMessage(userMessage);
+
+      setState(() {
+        final aiResponseMessage = ChatMessage(
+          text: aiResponse,
+          isUser: false,
+          timestamp: DateTime.now(),
+          suggestions: _getSuggestions(userMessage, _currentMode),
+        );
+
+        _chatMessages.add(aiResponseMessage);
+        _aiState = AIState.idle;
+      });
+    } catch (e) {
+      throw Exception('Chat service failed: $e');
+    }
+  }
+
+  // Generate comprehensive response for doctor matching
+  String _generateDoctorResultsResponse(
+    SpecialtyRecommendation recommendation,
+    DoctorMatchingResult result,
+  ) {
+    final buffer = StringBuffer();
+
+    if (result.matchedDoctors.isNotEmpty) {
+      buffer.writeln(
+        "🏥 Here are ${result.matchedDoctors.length} highly recommended doctors in your area:",
+      );
+    } else {
+      buffer.writeln(
+        "I couldn't find any doctors matching the suggested specialties in your area.",
+      );
+      buffer.writeln(
+        "You may want to try expanding your search radius or consider telehealth consultations.",
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  // Convert new doctor format to legacy format for compatibility
+  List<DoctorSuggestion> _convertToLegacyDoctorSuggestions(
+    List<MatchedDoctor> matchedDoctors,
+  ) {
+    return matchedDoctors
+        .map(
+          (doctor) => DoctorSuggestion(
+            name: doctor.name,
+            specialty: doctor.specialty,
+            rating: doctor.rating,
+            distance: doctor.distance,
+            availability: doctor.nextAvailable,
+          ),
+        )
+        .toList();
+  }
+
+  // Generate suggestions for doctor matching results
+  List<Widget> _getDoctorMatchingSuggestions(DoctorMatchingResult result) {
+    List<Widget> suggestions = [];
+
+    if (result.matchedDoctors.isNotEmpty) {
+      // Add booking suggestion for top doctor
+      final topDoctor = result.matchedDoctors.first;
+      suggestions.add(
+        AISuggestionChip(
+          text: "Book with ${topDoctor.name.split(' ').last}",
+          icon: Icons.calendar_today,
+          onTap: () => _initiateBooking(topDoctor),
+        ),
+      );
+
+      suggestions.add(
+        AISuggestionChip(
+          text: "See all ${result.matchedDoctors.length} doctors",
+          icon: Icons.list,
+          onTap: () => _showAllDoctors(result),
+        ),
+      );
+    }
+
+    suggestions.add(
+      AISuggestionChip(
+        text: "Refine symptoms",
+        icon: Icons.edit,
+        onTap: () =>
+            _sendQuickMessage("I have additional symptoms to describe"),
+      ),
+    );
+
+    suggestions.add(
+      AISuggestionChip(
+        text: "Emergency care",
+        icon: Icons.emergency,
+        onTap: () => _sendQuickMessage("I need emergency care immediately"),
+      ),
+    );
+
+    return suggestions;
+  }
+
+  // Initiate booking process with selected doctor
+  void _initiateBooking(MatchedDoctor doctor) {
+    _sendQuickMessage("I want to book an appointment with ${doctor.name}");
+  }
+
+  // Show detailed view of all matching doctors
+  void _showAllDoctors(DoctorMatchingResult result) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildDoctorListModal(result),
+    );
+  }
+
+  // Build modal showing all matching doctors
+  Widget _buildDoctorListModal(DoctorMatchingResult result) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Matching Doctors (${result.matchedDoctors.length})',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+
+          // Doctor list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: result.matchedDoctors.length,
+              itemBuilder: (context, index) {
+                final doctor = result.matchedDoctors[index];
+                return _buildDoctorCard(doctor);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build individual doctor card
+  Widget _buildDoctorCard(MatchedDoctor doctor) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with name and match score
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        doctor.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        doctor.specialty,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${(doctor.matchScore * 100).toInt()}% match',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Details
+            Row(
+              children: [
+                Icon(Icons.star, color: Colors.amber, size: 16),
+                const SizedBox(width: 4),
+                Text('${doctor.rating} (${doctor.reviewCount} reviews)'),
+                const SizedBox(width: 16),
+                Icon(Icons.location_on, color: Colors.grey, size: 16),
+                const SizedBox(width: 4),
+                Text(doctor.distance),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Availability and fee
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Next: ${doctor.nextAvailable}',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                Text(
+                  '\$${doctor.consultationFee.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _sendQuickMessage("Tell me more about ${doctor.name}");
+                    },
+                    child: const Text('View Details'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _initiateBooking(doctor);
+                    },
+                    child: const Text('Book Now'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Helper method to check API health
@@ -225,71 +604,6 @@ class _AssistantPageState extends State<AssistantPage> {
         ),
       );
     }
-  }
-
-  // Helper method to get doctor suggestions based on symptoms
-  List<DoctorSuggestion> _getDoctorSuggestions(String userMessage) {
-    final lowerMessage = userMessage.toLowerCase();
-
-    if (lowerMessage.contains('headache') ||
-        lowerMessage.contains('head pain') ||
-        lowerMessage.contains('migraine')) {
-      return [
-        DoctorSuggestion(
-          name: "Dr. Sarah Johnson",
-          specialty: "Neurologist",
-          rating: 4.8,
-          distance: "2.3 km",
-          availability: "Tomorrow 2:00 PM",
-        ),
-        DoctorSuggestion(
-          name: "Dr. Michael Chen",
-          specialty: "General Physician",
-          rating: 4.6,
-          distance: "1.8 km",
-          availability: "Today 4:30 PM",
-        ),
-      ];
-    } else if (lowerMessage.contains('fever') ||
-        lowerMessage.contains('temperature') ||
-        lowerMessage.contains('cold')) {
-      return [
-        DoctorSuggestion(
-          name: "Dr. Emily Davis",
-          specialty: "General Physician",
-          rating: 4.7,
-          distance: "1.2 km",
-          availability: "Today 3:00 PM",
-        ),
-        DoctorSuggestion(
-          name: "Dr. Robert Wilson",
-          specialty: "Infectious Disease",
-          rating: 4.9,
-          distance: "3.1 km",
-          availability: "Tomorrow 10:00 AM",
-        ),
-      ];
-    } else if (lowerMessage.contains('chest pain') ||
-        lowerMessage.contains('heart') ||
-        lowerMessage.contains('cardiac')) {
-      return [
-        DoctorSuggestion(
-          name: "Dr. Lisa Martinez",
-          specialty: "Cardiologist",
-          rating: 4.9,
-          distance: "2.8 km",
-          availability: "Today 5:00 PM",
-        ),
-        DoctorSuggestion(
-          name: "Dr. James Thompson",
-          specialty: "Emergency Medicine",
-          rating: 4.8,
-          distance: "1.5 km",
-          availability: "Immediate",
-        ),
-      ];
-    }
-    return [];
   }
 
   // Helper method to get suggestion chips based on context
@@ -389,10 +703,16 @@ class _AssistantPageState extends State<AssistantPage> {
     if (_currentMode != newMode) {
       setState(() {
         _currentMode = newMode;
-        // Clear messages and add new welcome message
-        _messages.clear();
-        _addWelcomeMessage();
+        // Just switch modes - messages are preserved in separate lists
+        // Reset any mode-specific state
+        if (_currentMode == ChatMode.simpleChat) {
+          _currentSymptom = '';
+          _currentStage = AIProgressStage.symptomAnalysis;
+        }
       });
+
+      // Scroll to bottom to show latest message in the newly selected mode
+      _scrollToBottom();
     }
   }
 
@@ -820,6 +1140,7 @@ class _AssistantPageState extends State<AssistantPage> {
       isUser: message.isUser,
       timestamp: message.timestamp,
       suggestions: message.suggestions,
+      isLoading: message.isLoading,
     );
   }
 }
@@ -830,6 +1151,7 @@ class ChatMessage {
   final DateTime timestamp;
   final List<DoctorSuggestion>? doctorSuggestions;
   final List<Widget>? suggestions;
+  final bool isLoading;
 
   ChatMessage({
     required this.text,
@@ -837,6 +1159,7 @@ class ChatMessage {
     required this.timestamp,
     this.doctorSuggestions,
     this.suggestions,
+    this.isLoading = false,
   });
 }
 

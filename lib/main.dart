@@ -10,6 +10,7 @@ import 'screens/profile_setup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/doctor/doctor_dashboard.dart';
 import 'screens/doctor/doctor_profile_screen.dart';
+import 'screens/doctor/doctor_appointments_screen.dart';
 import 'screens/doctor_list_screen.dart';
 import 'firebase_options.dart';
 
@@ -40,6 +41,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/doctor-dashboard': (context) => const DoctorDashboard(),
         '/doctor-profile': (context) => const DoctorProfileScreen(),
+        '/doctor-appointments': (context) => const DoctorAppointmentScreen(),
         '/doctors': (context) => const DoctorListScreen(),
       },
     );
