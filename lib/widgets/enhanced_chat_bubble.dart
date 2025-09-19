@@ -7,6 +7,7 @@ class EnhancedChatBubble extends StatefulWidget {
   final DateTime timestamp;
   final List<Widget>? suggestions;
   final VoidCallback? onTap;
+  final bool isLoading;
 
   const EnhancedChatBubble({
     super.key,
@@ -15,6 +16,7 @@ class EnhancedChatBubble extends StatefulWidget {
     required this.timestamp,
     this.suggestions,
     this.onTap,
+    this.isLoading = false,
   });
 
   @override
@@ -35,21 +37,14 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
 
     _animationController.forward();
   }
@@ -64,7 +59,7 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
-    
+
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -87,18 +82,18 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
                 ),
                 SizedBox(width: isSmallScreen ? 8 : 12),
               ],
-              
+
               Expanded(
                 child: Column(
-                  crossAxisAlignment: widget.isUser 
-                      ? CrossAxisAlignment.end 
+                  crossAxisAlignment: widget.isUser
+                      ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
                       decoration: BoxDecoration(
-                        color: widget.isUser 
-                            ? AppTheme.primaryColor 
+                        color: widget.isUser
+                            ? AppTheme.primaryColor
                             : AppTheme.surfaceColor,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
@@ -107,7 +102,7 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
                                 ? AppTheme.primaryColor.withOpacity(0.2)
                                 : AppTheme.cardShadow.first.color,
                             blurRadius: widget.isUser ? 8 : 4,
-                            offset: widget.isUser 
+                            offset: widget.isUser
                                 ? const Offset(0, 2)
                                 : AppTheme.cardShadow.first.offset,
                           ),
@@ -119,22 +114,32 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
                               )
                             : null,
                       ),
-                      child: Text(
-                        widget.message,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: widget.isUser 
-                              ? Colors.white 
-                              : AppTheme.textPrimary,
-                          fontSize: isSmallScreen ? 13 : 14,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.message,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: widget.isUser
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
+                                  fontSize: isSmallScreen ? 13 : 14,
+                                ),
+                          ),
+                          if (widget.isLoading) ...[
+                            SizedBox(height: 8),
+                            _LoadingDots(),
+                          ],
+                        ],
                       ),
                     ),
-                    
+
                     if (widget.suggestions != null) ...[
                       SizedBox(height: isSmallScreen ? 8 : 12),
                       ...widget.suggestions!,
                     ],
-                    
+
                     SizedBox(height: isSmallScreen ? 2 : 4),
                     Text(
                       _formatTime(widget.timestamp),
@@ -146,7 +151,7 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
                   ],
                 ),
               ),
-              
+
               if (widget.isUser) ...[
                 SizedBox(width: isSmallScreen ? 8 : 12),
                 Container(
@@ -154,7 +159,9 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
                   height: isSmallScreen ? 28 : 32,
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
+                    borderRadius: BorderRadius.circular(
+                      isSmallScreen ? 14 : 16,
+                    ),
                   ),
                   child: Icon(
                     Icons.person,
@@ -173,7 +180,7 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
   String _formatTime(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {
@@ -184,4 +191,70 @@ class _EnhancedChatBubbleState extends State<EnhancedChatBubble>
       return '${difference.inDays}d ago';
     }
   }
-} 
+}
+
+class _LoadingDots extends StatefulWidget {
+  @override
+  _LoadingDotsState createState() => _LoadingDotsState();
+}
+
+class _LoadingDotsState extends State<_LoadingDots>
+    with TickerProviderStateMixin {
+  late AnimationController _controller;
+  late List<Animation<double>> _animations;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    _animations = List.generate(3, (index) {
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _controller,
+          curve: Interval(
+            index * 0.2,
+            (index * 0.2) + 0.4,
+            curve: Curves.easeInOut,
+          ),
+        ),
+      );
+    });
+
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (index) {
+        return AnimatedBuilder(
+          animation: _animations[index],
+          builder: (context, child) {
+            return Container(
+              margin: EdgeInsets.only(right: index < 2 ? 4 : 0),
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.textLight.withOpacity(
+                  0.3 + (_animations[index].value * 0.7),
+                ),
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+}
