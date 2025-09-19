@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
 import '../providers/auth_provider.dart';
-import 'profile_setup_screen.dart';
-import 'home_screen.dart';
+import '../services/navigation_service.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -113,16 +112,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             ),
           );
 
-          // Navigate based on role
-          if (_isDoctor) {
-            Navigator.of(context).pushReplacementNamed('/doctor-profile');
-          } else {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const ProfileSetupScreen(),
-              ),
-            );
-          }
+          // Navigate based on role using centralized service
+          await NavigationService.navigateBasedOnRole(
+            context,
+            result.user!.uid,
+          );
         } else {
           print('Signup failed: ${result.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -172,8 +166,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
       if (mounted) {
         if (result.success) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          // Use centralized role-based navigation
+          await NavigationService.navigateBasedOnRole(
+            context,
+            result.user!.uid,
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(

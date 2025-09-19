@@ -5,6 +5,7 @@ import '../../app_theme.dart';
 import '../../models/doctor_profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/navigation_service.dart';
+import 'doctor_appointments_screen.dart';
 
 class DoctorDashboard extends ConsumerStatefulWidget {
   const DoctorDashboard({super.key});
@@ -575,28 +576,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   }
 
   Widget _buildAppointmentsTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.calendar_today_outlined,
-            size: 64,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Appointments Management',
-            style: TextStyle(fontSize: 18, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon...',
-            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
+    return const DoctorAppointmentScreen();
   }
 
   Widget _buildPatientsTab() {

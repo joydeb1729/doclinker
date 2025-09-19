@@ -5,6 +5,8 @@ import '../../app_theme.dart';
 import '../../models/doctor_profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/navigation_service.dart';
+import '../../services/profile_validation_service.dart';
+import '../../services/embedding_service.dart';
 
 class DoctorProfileScreen extends ConsumerStatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -195,13 +197,21 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 updatedAt: DateTime.now(),
               );
 
+      // Generate new embedding for the updated profile
+      final embedding = await EmbeddingService.generateDoctorEmbedding(
+        updatedProfile,
+      );
+      final profileWithEmbedding = updatedProfile.copyWith(
+        profileEmbedding: embedding,
+      );
+
       final doctorService = DoctorService();
-      await doctorService.saveDoctorProfile(updatedProfile);
+      await doctorService.saveDoctorProfile(profileWithEmbedding);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Profile updated successfully'),
+            content: Text('Profile updated successfully with new embedding'),
             backgroundColor: Colors.green,
           ),
         );
@@ -263,6 +273,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_doctorProfile != null)
+                          _buildProfileCompletenessCard(),
+                        if (_doctorProfile != null) const SizedBox(height: 24),
                         _buildBasicInfoSection(),
                         const SizedBox(height: 24),
                         _buildMedicalInfoSection(),
@@ -310,6 +323,94 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               Text('Error: $error'),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileCompletenessCard() {
+    if (_doctorProfile == null) return const SizedBox.shrink();
+
+    final completionPercentage = _doctorProfile!.profileCompletionPercentage;
+    final isComplete = _doctorProfile!.isProfileComplete;
+    final validationMessage = ProfileValidationService.getValidationMessage(
+      _doctorProfile!,
+    );
+    final canAcceptAppointments =
+        ProfileValidationService.canAcceptAppointments(_doctorProfile!);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isComplete ? Icons.check_circle : Icons.info_outline,
+                  color: isComplete ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Profile Completion',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${completionPercentage.toInt()}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isComplete ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            LinearProgressIndicator(
+              value: completionPercentage / 100,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isComplete ? Colors.green : Colors.orange,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            Text(
+              validationMessage,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+
+            if (!canAcceptAppointments) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.amber.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Complete your profile to start accepting appointments',
+                        style: TextStyle(
+                          color: Colors.amber.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

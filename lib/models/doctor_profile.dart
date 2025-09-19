@@ -1,5 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Profile validation helper classes
+class ProfileField {
+  final String name;
+  final bool isCompleted;
+
+  const ProfileField(this.name, this.isCompleted);
+}
+
+enum ProfileCompletionStatus {
+  incomplete,
+  halfComplete,
+  almostComplete,
+  complete,
+}
+
 class DoctorProfile {
   final String uid;
   final String email;
@@ -37,6 +52,12 @@ class DoctorProfile {
   final double averageRating;
   final int totalReviews;
 
+  // RAG/AI Fields for symptom matching
+  final List<double>? profileEmbedding; // Vector embedding for RAG matching
+  final List<String>?
+  expertiseKeywords; // Medical conditions/symptoms this doctor treats
+  final List<String>? treatmentMethods; // Treatment approaches
+
   DoctorProfile({
     required this.uid,
     required this.email,
@@ -63,6 +84,9 @@ class DoctorProfile {
     this.totalPatients = 0,
     this.averageRating = 0.0,
     this.totalReviews = 0,
+    this.profileEmbedding,
+    this.expertiseKeywords,
+    this.treatmentMethods,
   });
 
   // Convert to Firestore document
@@ -93,6 +117,9 @@ class DoctorProfile {
       'totalPatients': totalPatients,
       'averageRating': averageRating,
       'totalReviews': totalReviews,
+      'profileEmbedding': profileEmbedding,
+      'expertiseKeywords': expertiseKeywords,
+      'treatmentMethods': treatmentMethods,
     };
   }
 
@@ -125,11 +152,20 @@ class DoctorProfile {
       longitude: data['longitude']?.toDouble(),
       isVerified: data['isVerified'] ?? false,
       isActive: data['isActive'] ?? true,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _safeParseTimestamp(data['createdAt']) ?? DateTime.now(),
+      updatedAt: _safeParseTimestamp(data['updatedAt']) ?? DateTime.now(),
       totalPatients: data['totalPatients'] ?? 0,
       averageRating: (data['averageRating'] ?? 0.0).toDouble(),
       totalReviews: data['totalReviews'] ?? 0,
+      profileEmbedding: data['profileEmbedding'] != null
+          ? List<double>.from(data['profileEmbedding'])
+          : null,
+      expertiseKeywords: data['expertiseKeywords'] != null
+          ? List<String>.from(data['expertiseKeywords'])
+          : null,
+      treatmentMethods: data['treatmentMethods'] != null
+          ? List<String>.from(data['treatmentMethods'])
+          : null,
     );
   }
 
@@ -157,6 +193,7 @@ class DoctorProfile {
     int? totalPatients,
     double? averageRating,
     int? totalReviews,
+    List<double>? profileEmbedding,
   }) {
     return DoctorProfile(
       uid: uid,
@@ -185,6 +222,7 @@ class DoctorProfile {
       totalPatients: totalPatients ?? this.totalPatients,
       averageRating: averageRating ?? this.averageRating,
       totalReviews: totalReviews ?? this.totalReviews,
+      profileEmbedding: profileEmbedding ?? this.profileEmbedding,
     );
   }
 
@@ -234,6 +272,79 @@ class DoctorProfile {
     return false;
   }
 
+  // Profile completeness validation
+  bool get isProfileComplete {
+    return _requiredFields.every((field) => field.isCompleted) &&
+        _hasMinimumSpecializations &&
+        _hasMinimumAvailability;
+  }
+
+  List<ProfileField> get _requiredFields {
+    return [
+      ProfileField('Full Name', fullName.trim().isNotEmpty),
+      ProfileField('Medical License', medicalLicense.trim().isNotEmpty),
+      ProfileField('Medical Degree', medicalDegree.trim().isNotEmpty),
+      ProfileField(
+        'Hospital Affiliation',
+        hospitalAffiliation.trim().isNotEmpty,
+      ),
+      ProfileField('Clinic Address', clinicAddress.trim().isNotEmpty),
+      ProfileField('Years of Experience', yearsOfExperience > 0),
+      ProfileField('Consultation Fee', consultationFee > 0),
+    ];
+  }
+
+  bool get _hasMinimumSpecializations => specializations.isNotEmpty;
+
+  bool get _hasMinimumAvailability {
+    return weeklyAvailability.values.any((slots) => slots.isNotEmpty);
+  }
+
+  List<String> get missingRequiredFields {
+    final missing = <String>[];
+
+    for (final field in _requiredFields) {
+      if (!field.isCompleted) {
+        missing.add(field.name);
+      }
+    }
+
+    if (!_hasMinimumSpecializations) {
+      missing.add('At least one specialization');
+    }
+
+    if (!_hasMinimumAvailability) {
+      missing.add('Weekly availability (at least one time slot)');
+    }
+
+    return missing;
+  }
+
+  double get profileCompletionPercentage {
+    final totalRequiredItems =
+        _requiredFields.length + 2; // +2 for specializations and availability
+    final completedItems =
+        _requiredFields.where((field) => field.isCompleted).length +
+        (_hasMinimumSpecializations ? 1 : 0) +
+        (_hasMinimumAvailability ? 1 : 0);
+
+    return (completedItems / totalRequiredItems * 100).roundToDouble();
+  }
+
+  ProfileCompletionStatus get completionStatus {
+    final percentage = profileCompletionPercentage;
+
+    if (percentage == 100) {
+      return ProfileCompletionStatus.complete;
+    } else if (percentage >= 75) {
+      return ProfileCompletionStatus.almostComplete;
+    } else if (percentage >= 50) {
+      return ProfileCompletionStatus.halfComplete;
+    } else {
+      return ProfileCompletionStatus.incomplete;
+    }
+  }
+
   String _getDayName(int weekday) {
     switch (weekday) {
       case 1:
@@ -252,6 +363,37 @@ class DoctorProfile {
         return 'Sunday';
       default:
         return 'Monday';
+    }
+  }
+
+  // Safe parsing of Firestore Timestamps
+  static DateTime? _safeParseTimestamp(dynamic value) {
+    try {
+      if (value == null) {
+        return null;
+      }
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      if (value is DateTime) {
+        return value;
+      }
+      if (value is String) {
+        // Try to parse ISO string format
+        return DateTime.tryParse(value);
+      }
+      if (value is int) {
+        // Treat as milliseconds since epoch
+        return DateTime.fromMillisecondsSinceEpoch(value);
+      }
+      // If none of the above, return null
+      print('Warning: Unexpected timestamp type: ${value.runtimeType}');
+      return null;
+    } catch (e) {
+      print(
+        'Error parsing timestamp: $e, value: $value, type: ${value.runtimeType}',
+      );
+      return null;
     }
   }
 }
