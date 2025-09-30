@@ -32,14 +32,17 @@ Available specialties: Cardiology, Dermatology, Endocrinology, Gastroenterology,
 
 Important rules:
 - Do NOT attempt a medical diagnosis. Only suggest the specialty.
+- Prioritize specific specialties over General Medicine when possible.
+- Only include "General Medicine" if the symptoms are truly general or unclear.
+- For specific conditions like heart problems, suggest Cardiology (not General Medicine).
 - Keep explanations clear and easy to understand.
-- Maximum 3 specialties.
+- Maximum 2 specialties to ensure precision.
 
 Format your response as JSON:
 {
-  "explanation": "Based on your symptoms, you should visit a doctor specialized in [specialty]. Sometimes, [secondary specialty] may also be relevant.",
+  "explanation": "Based on your symptoms, you should visit a doctor specialized in [specialty].",
   "condition": "Short condition/category word like 'Headache', 'Migraine', 'Back pain'",
-  "specialties": ["Primary Specialty", "Secondary Specialty"]
+  "specialties": ["Primary Specialty"]
 }
 ''';
 
@@ -248,6 +251,10 @@ Format your response as JSON:
             specialties,
           );
 
+          print(
+            '🔄 Evaluating: ${doctorProfile.fullName} (${doctorProfile.specializations.join(', ')}) vs ${specialties.join(', ')} - Score: ${(matchScore * 100).toInt()}%',
+          );
+
           if (matchScore > 0) {
             final matchedDoctor = _convertToMatchedDoctor(
               doctorProfile,
@@ -256,8 +263,10 @@ Format your response as JSON:
             );
             matchedDoctors.add(matchedDoctor);
             print(
-              '✅ Matched doctor: ${doctorProfile.fullName} (${doctorProfile.specializations.join(', ')}) - Score: ${(matchScore * 100).toInt()}%',
+              '✅ MATCHED: ${doctorProfile.fullName} - Final Score: ${(matchScore * 100).toInt()}%',
             );
+          } else {
+            print('❌ NO MATCH: ${doctorProfile.fullName} - Score too low');
           }
         } catch (e) {
           print('❌ Error processing doctor profile: $e');
@@ -292,35 +301,66 @@ Format your response as JSON:
       return 0.0;
     }
 
+    // Separate specific and general specialties
+    final specificSpecialties = targetSpecialties
+        .where((s) => s.toLowerCase() != 'general medicine')
+        .toList();
+    final hasGeneralMedicine = targetSpecialties.any(
+      (s) => s.toLowerCase() == 'general medicine',
+    );
+
     double maxScore = 0.0;
+    bool foundSpecificMatch = false;
 
-    for (String targetSpecialty in targetSpecialties) {
+    // First, try to match specific specialties (higher priority)
+    for (String targetSpecialty in specificSpecialties) {
       for (String doctorSpecialty in doctor.specializations) {
-        // Exact match gets highest score
-        if (targetSpecialty.toLowerCase() == doctorSpecialty.toLowerCase()) {
-          maxScore = 1.0;
-          break;
-        }
+        double score = 0.0;
 
-        // Partial match gets medium score
-        if (doctorSpecialty.toLowerCase().contains(
+        // Exact match for specific specialty gets highest score
+        if (targetSpecialty.toLowerCase() == doctorSpecialty.toLowerCase()) {
+          score = 1.0;
+          foundSpecificMatch = true;
+        }
+        // Partial match for specific specialty
+        else if (doctorSpecialty.toLowerCase().contains(
               targetSpecialty.toLowerCase(),
             ) ||
             targetSpecialty.toLowerCase().contains(
               doctorSpecialty.toLowerCase(),
             )) {
-          maxScore = math.max(maxScore, 0.7);
+          score = 0.8;
+          foundSpecificMatch = true;
+        }
+        // Related specialty matches
+        else {
+          final relatedScore = _getRelatedSpecialtyScore(
+            targetSpecialty,
+            doctorSpecialty,
+          );
+          if (relatedScore > 0) {
+            score = relatedScore;
+            foundSpecificMatch = true;
+          }
         }
 
-        // Related specialty matches
-        final relatedScore = _getRelatedSpecialtyScore(
-          targetSpecialty,
-          doctorSpecialty,
-        );
-        maxScore = math.max(maxScore, relatedScore);
+        maxScore = math.max(maxScore, score);
       }
+    }
 
-      if (maxScore == 1.0) break; // Perfect match found
+    // If no specific match found and General Medicine is requested,
+    // give lower score for doctors with only General Medicine
+    if (!foundSpecificMatch && hasGeneralMedicine) {
+      for (String doctorSpecialty in doctor.specializations) {
+        if (doctorSpecialty.toLowerCase() == 'general medicine') {
+          // Lower score for general medicine when specific specialty was requested
+          maxScore = math.max(
+            maxScore,
+            specificSpecialties.isNotEmpty ? 0.3 : 0.7,
+          );
+          break;
+        }
+      }
     }
 
     return maxScore;
