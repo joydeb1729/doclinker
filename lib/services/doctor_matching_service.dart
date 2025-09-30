@@ -83,18 +83,19 @@ Format your response as JSON:
         explanation:
             "Based on your symptoms, you should visit a doctor specialized in Neurology.",
         condition: "Headache",
-        specialties: ["Neurology", "General Medicine"],
+        specialties: ["Neurology"],
       );
     }
 
     if (symptomsLower.contains('heart') ||
         symptomsLower.contains('chest') ||
-        symptomsLower.contains('cardiac')) {
+        symptomsLower.contains('cardiac') ||
+        symptomsLower.contains('surgery')) {
       return SpecialtyRecommendation(
         explanation:
             "Based on your symptoms, you should visit a doctor specialized in Cardiology.",
         condition: "Heart issue",
-        specialties: ["Cardiology", "General Medicine"],
+        specialties: ["Cardiology"],
       );
     }
 
@@ -106,7 +107,7 @@ Format your response as JSON:
         explanation:
             "Based on your symptoms, you should visit a doctor specialized in Orthopedics.",
         condition: "Joint pain",
-        specialties: ["Orthopedics", "General Medicine"],
+        specialties: ["Orthopedics"],
       );
     }
 
@@ -117,7 +118,7 @@ Format your response as JSON:
         explanation:
             "Based on your symptoms, you should visit a doctor specialized in Dermatology.",
         condition: "Skin issue",
-        specialties: ["Dermatology", "General Medicine"],
+        specialties: ["Dermatology"],
       );
     }
 
@@ -255,7 +256,8 @@ Format your response as JSON:
             '🔄 Evaluating: ${doctorProfile.fullName} (${doctorProfile.specializations.join(', ')}) vs ${specialties.join(', ')} - Score: ${(matchScore * 100).toInt()}%',
           );
 
-          if (matchScore > 0) {
+          // Only include doctors with meaningful match scores (50% or higher)
+          if (matchScore >= 0.5) {
             final matchedDoctor = _convertToMatchedDoctor(
               doctorProfile,
               matchScore,
