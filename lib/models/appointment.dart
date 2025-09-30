@@ -360,12 +360,17 @@ class AppointmentService {
         query = query.where('status', isEqualTo: status.name);
       }
 
-      query = query.orderBy('appointmentDate');
-
       final querySnapshot = await query.get();
-      return querySnapshot.docs
+
+      final appointments = querySnapshot.docs
           .map((doc) => Appointment.fromFirestore(doc))
           .toList();
+
+      // Sort on client side to avoid composite index
+      appointments.sort(
+        (a, b) => a.appointmentDate.compareTo(b.appointmentDate),
+      );
+      return appointments;
     } catch (e) {
       throw Exception('Failed to get doctor appointments: $e');
     }
@@ -401,12 +406,17 @@ class AppointmentService {
         query = query.where('status', isEqualTo: status.name);
       }
 
-      query = query.orderBy('appointmentDate');
-
       final querySnapshot = await query.get();
-      return querySnapshot.docs
+
+      final appointments = querySnapshot.docs
           .map((doc) => Appointment.fromFirestore(doc))
           .toList();
+
+      // Sort on client side to avoid composite index
+      appointments.sort(
+        (a, b) => a.appointmentDate.compareTo(b.appointmentDate),
+      );
+      return appointments;
     } catch (e) {
       throw Exception('Failed to get patient appointments: $e');
     }
