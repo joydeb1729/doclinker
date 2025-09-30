@@ -312,6 +312,35 @@ class AppointmentService {
     }
   }
 
+  /// Update appointment payment status
+  static Future<void> updatePaymentStatus(
+    String appointmentId,
+    bool isPaid,
+  ) async {
+    try {
+      final updateData = {
+        'isPaid': isPaid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (isPaid) {
+        updateData['paidAt'] = FieldValue.serverTimestamp();
+      }
+
+      await _firestore
+          .collection(_appointmentsCollection)
+          .doc(appointmentId)
+          .update(updateData);
+
+      print(
+        '✅ Payment status updated: $appointmentId -> ${isPaid ? 'Paid' : 'Pending'}',
+      );
+    } catch (e) {
+      print('❌ Error updating payment status: $e');
+      throw Exception('Failed to update payment status: $e');
+    }
+  }
+
   /// Cancel appointment
   static Future<void> cancelAppointment(
     String appointmentId, {

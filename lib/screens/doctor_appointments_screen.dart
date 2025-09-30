@@ -170,6 +170,32 @@ class _DoctorAppointmentsScreenState
     }
   }
 
+  Future<void> _updatePaymentStatus(Appointment appointment) async {
+    try {
+      await appointment_service.AppointmentService.updatePaymentStatus(
+        appointment.id,
+        true,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment status updated to Paid'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      _loadAppointments();
+      _loadStatistics();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update payment status: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -599,9 +625,12 @@ class _DoctorAppointmentsScreenState
                 children: [
                   Icon(Icons.payment, size: 16, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Fee: \$${appointment.fee.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  Expanded(
+                    child: Text(
+                      'Fee: \$${appointment.fee.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Container(
@@ -624,6 +653,41 @@ class _DoctorAppointmentsScreenState
                   ),
                 ],
               ),
+              if (!appointment.isPaid) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () => _updatePaymentStatus(appointment),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green.shade700),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.payment, size: 14, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text(
+                            'Mark as Paid',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
 
             // Action buttons based on status
