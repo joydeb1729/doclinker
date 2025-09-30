@@ -199,9 +199,9 @@ class _DoctorAppointmentsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Appointment Management'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        toolbarHeight: 0, // Remove the title area
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
