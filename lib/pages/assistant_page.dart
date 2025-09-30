@@ -10,6 +10,7 @@ import '../widgets/hospital_selector.dart';
 import '../controllers/location_controller.dart';
 import '../services/chat_service.dart';
 import '../services/doctor_matching_service.dart';
+import '../screens/doctor_schedule_booking_screen.dart';
 
 class AssistantPage extends StatefulWidget {
   final LocationController locationController;
@@ -409,7 +410,11 @@ class _AssistantPageState extends State<AssistantPage> {
 
   // Initiate booking process with selected doctor
   void _initiateBooking(MatchedDoctor doctor) {
-    _sendQuickMessage("I want to book an appointment with ${doctor.name}");
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => DoctorScheduleBookingScreen(doctor: doctor),
+      ),
+    );
   }
 
   // Show detailed view of all matching doctors

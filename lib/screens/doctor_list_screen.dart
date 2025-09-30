@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_theme.dart';
 import '../models/doctor_profile.dart';
-import 'book_appointment_screen.dart';
+import '../services/doctor_matching_service.dart';
+import 'doctor_schedule_booking_screen.dart';
 
 class DoctorListScreen extends ConsumerStatefulWidget {
   const DoctorListScreen({super.key});
@@ -377,9 +378,31 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
+                // Convert DoctorProfile to MatchedDoctor for booking
+                final matchedDoctor = MatchedDoctor(
+                  id: doctor.uid,
+                  name: doctor.fullName,
+                  specialty: doctor.specializations.isNotEmpty
+                      ? doctor.specializations.first
+                      : 'General Medicine',
+                  subSpecialties: doctor.specializations,
+                  rating: 4.5, // Default rating for now
+                  reviewCount: 0, // Default review count for now
+                  distance: '0 km', // Default distance
+                  matchScore: 100.0, // Default match score
+                  yearsExperience: doctor.yearsOfExperience,
+                  education: doctor.medicalDegree,
+                  hospitalAffiliation: doctor.hospitalAffiliation,
+                  consultationFee: doctor.consultationFee,
+                  availableToday: true,
+                  nextAvailable: 'Today',
+                  profileImage: doctor.profileImageUrl,
+                );
+
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => BookAppointmentScreen(doctor: doctor),
+                    builder: (context) =>
+                        DoctorScheduleBookingScreen(doctor: matchedDoctor),
                   ),
                 );
               },

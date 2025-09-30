@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../app_theme.dart';
 import '../models/doctor_profile.dart';
 import '../models/appointment.dart';
+import '../services/appointment_service.dart' as appointment_service;
 
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   final DoctorProfile doctor;
@@ -23,6 +25,8 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
   String? _selectedTimeSlot;
   AppointmentType _selectedType = AppointmentType.consultation;
   bool _isLoading = false;
+  bool _isLoadingSlots = false;
+  List<String> _availableTimeSlots = [];
 
   @override
   void dispose() {
@@ -53,7 +57,9 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
       setState(() {
         _selectedDate = picked;
         _selectedTimeSlot = null; // Reset time slot when date changes
+        _availableTimeSlots = [];
       });
+      _loadAvailableTimeSlots();
     }
   }
 
@@ -62,6 +68,41 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
 
     final dayName = _getDayName(_selectedDate!.weekday);
     return widget.doctor.weeklyAvailability[dayName] ?? [];
+  }
+
+  Future<void> _loadAvailableTimeSlots() async {
+    if (_selectedDate == null) return;
+
+    setState(() {
+      _isLoadingSlots = true;
+    });
+
+    try {
+      final slots =
+          await appointment_service.AppointmentService.getAvailableTimeSlots(
+            widget.doctor.uid,
+            _selectedDate!,
+          );
+
+      setState(() {
+        _availableTimeSlots = slots;
+        _isLoadingSlots = false;
+      });
+    } catch (e) {
+      setState(() {
+        _availableTimeSlots = [];
+        _isLoadingSlots = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading available slots: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   String _getDayName(int weekday) {
@@ -97,24 +138,76 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
       return;
     }
 
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to book an appointment'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Here you would normally create the appointment
-      // For now, we'll just show a success message
-      await Future.delayed(const Duration(seconds: 2));
+      final appointmentId =
+          await appointment_service.AppointmentService.createAppointment(
+            patientId: user.uid,
+            doctorId: widget.doctor.uid,
+            appointmentDate: _selectedDate!,
+            timeSlot: _selectedTimeSlot!,
+            type: _selectedType,
+            reason: _reasonController.text.trim().isEmpty
+                ? null
+                : _reasonController.text.trim(),
+            symptoms: _symptomsController.text.trim().isEmpty
+                ? null
+                : _symptomsController.text.trim(),
+            consultationFee: widget.doctor.consultationFee,
+          );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appointment booked successfully!'),
-            backgroundColor: Colors.green,
+        // Show success dialog with appointment details
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Appointment Booked!'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your appointment has been successfully booked.'),
+                const SizedBox(height: 8),
+                Text(
+                  'Appointment ID: $appointmentId',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                Text('Doctor: Dr. ${widget.doctor.fullName}'),
+                Text(
+                  'Date: ${_selectedDate?.day}/${_selectedDate?.month}/${_selectedDate?.year}',
+                ),
+                Text('Time: $_selectedTimeSlot'),
+                Text(
+                  'Fee: \$${widget.doctor.consultationFee.toStringAsFixed(2)}',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to previous screen
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
-
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
