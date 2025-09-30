@@ -5,7 +5,7 @@ import '../../app_theme.dart';
 import '../../models/doctor_profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/navigation_service.dart';
-import 'doctor_appointments_screen.dart';
+import '../doctor_appointments_screen.dart';
 
 class DoctorDashboard extends ConsumerStatefulWidget {
   const DoctorDashboard({super.key});
@@ -94,8 +94,6 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                   children: [
                     _buildOverviewTab(),
                     _buildAppointmentsTab(),
-                    _buildPatientsTab(),
-                    _buildScheduleTab(),
                     _buildAnalyticsTab(),
                   ],
                 ),
@@ -115,16 +113,6 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
                 icon: Icon(Icons.calendar_today_outlined),
                 activeIcon: Icon(Icons.calendar_today),
                 label: 'Appointments',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.people_outline),
-                activeIcon: Icon(Icons.people),
-                label: 'Patients',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.schedule_outlined),
-                activeIcon: Icon(Icons.schedule),
-                label: 'Schedule',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.analytics_outlined),
@@ -164,10 +152,6 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
       case 1:
         return 'Appointments';
       case 2:
-        return 'Patients';
-      case 3:
-        return 'Schedule';
-      case 4:
         return 'Analytics';
       default:
         return 'Dashboard';
@@ -576,53 +560,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   }
 
   Widget _buildAppointmentsTab() {
-    return const DoctorAppointmentScreen();
-  }
-
-  Widget _buildPatientsTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.people_outline, size: 64, color: AppTheme.textSecondary),
-          const SizedBox(height: 16),
-          Text(
-            'Patients Management',
-            style: TextStyle(fontSize: 18, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon...',
-            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScheduleTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.schedule_outlined,
-            size: 64,
-            color: AppTheme.textSecondary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Schedule Management',
-            style: TextStyle(fontSize: 18, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon...',
-            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
+    return const DoctorAppointmentsScreen();
   }
 
   Widget _buildAnalyticsTab() {
