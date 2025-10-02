@@ -1,14 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../providers/patient_profile_provider.dart';
 import '../screens/login_screen.dart';
+import '../screens/patient_profile_screen.dart';
+import '../services/appointment_service.dart' as appointment_service;
 
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  int _totalAppointments = 0;
+  bool _isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatientStats();
+    // Load patient profile
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(patientProfileProvider.notifier).loadPatientProfile();
+    });
+  }
+
+  Future<void> _loadPatientStats() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final appointments = await appointment_service
+            .AppointmentService.getPatientAppointments(user.uid);
+        setState(() {
+          _totalAppointments = appointments.length;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingStats = false;
+      });
+    }
+  }
+
+  Future<void> _navigateToEditProfile() async {
+    final profileState = ref.read(patientProfileProvider);
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            PatientProfileScreen(initialProfile: profileState.profile),
+      ),
+    );
+
+    // If profile was updated, refresh the profile data and stats
+    if (result != null) {
+      ref.read(patientProfileProvider.notifier).loadPatientProfile();
+      _loadPatientStats();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profileState = ref.watch(patientProfileProvider);
+    final profile = profileState.profile;
     final screenHeight = MediaQuery.of(context).size.height;
     final isSmallScreen = screenHeight < 700;
 
@@ -46,16 +105,23 @@ class ProfilePage extends ConsumerWidget {
                 SizedBox(height: isSmallScreen ? 12 : 16),
 
                 // User Info
-                Text(
-                  'John Doe',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isSmallScreen ? 18 : 20,
+                if (profileState.isLoading)
+                  const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Text(
+                    profile?.fullName ?? 'Patient',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreen ? 18 : 20,
+                    ),
                   ),
-                ),
                 SizedBox(height: isSmallScreen ? 2 : 4),
                 Text(
-                  'john.doe@email.com',
+                  profile?.email ?? 'Loading...',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,
                     fontSize: isSmallScreen ? 12 : 14,
@@ -93,7 +159,7 @@ class ProfilePage extends ConsumerWidget {
                 child: _buildStatCard(
                   context,
                   icon: Icons.calendar_today,
-                  value: '12',
+                  value: _isLoadingStats ? '...' : '$_totalAppointments',
                   label: 'Appointments',
                   color: AppTheme.primaryColor,
                   isSmallScreen: isSmallScreen,
@@ -103,9 +169,11 @@ class ProfilePage extends ConsumerWidget {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  icon: Icons.star,
-                  value: '4.8',
-                  label: 'Rating',
+                  icon: Icons.account_circle,
+                  value: profile != null
+                      ? '${profile.completionPercentage.toInt()}%'
+                      : '...',
+                  label: 'Profile',
                   color: AppTheme.accentColor,
                   isSmallScreen: isSmallScreen,
                 ),
@@ -114,9 +182,9 @@ class ProfilePage extends ConsumerWidget {
               Expanded(
                 child: _buildStatCard(
                   context,
-                  icon: Icons.favorite,
-                  value: '5',
-                  label: 'Favorites',
+                  icon: Icons.verified_user,
+                  value: profile?.isActive == true ? 'Active' : 'Inactive',
+                  label: 'Status',
                   color: AppTheme.successColor,
                   isSmallScreen: isSmallScreen,
                 ),
@@ -136,7 +204,7 @@ class ProfilePage extends ConsumerWidget {
                 icon: Icons.person_outline,
                 title: 'Edit Profile',
                 subtitle: 'Update your personal information',
-                onTap: () {},
+                onTap: () => _navigateToEditProfile(),
                 isSmallScreen: isSmallScreen,
               ),
               _buildMenuItem(
