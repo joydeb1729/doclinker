@@ -556,7 +556,7 @@ class _AssistantPageState extends State<AssistantPage> {
                   ),
                 ),
                 Text(
-                  '\$${doctor.consultationFee.toStringAsFixed(0)}',
+                  '৳${doctor.consultationFee.toStringAsFixed(0)}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ],
