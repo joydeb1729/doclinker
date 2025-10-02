@@ -16,7 +16,7 @@ class BottomNavBar extends StatelessWidget {
     // Get screen size for responsive design
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor,
@@ -56,14 +56,6 @@ class BottomNavBar extends StatelessWidget {
               _buildNavItem(
                 context,
                 index: 2,
-                icon: Icons.history_outlined,
-                activeIcon: Icons.history,
-                label: 'History',
-                isSmallScreen: isSmallScreen,
-              ),
-              _buildNavItem(
-                context,
-                index: 3,
                 icon: Icons.location_on_outlined,
                 activeIcon: Icons.location_on,
                 label: 'Nearby',
@@ -85,7 +77,7 @@ class BottomNavBar extends StatelessWidget {
     required bool isSmallScreen,
   }) {
     final isActive = currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () => onTap(index),
       child: Container(
@@ -94,7 +86,7 @@ class BottomNavBar extends StatelessWidget {
           vertical: isSmallScreen ? 6 : 8,
         ),
         decoration: BoxDecoration(
-          color: isActive 
+          color: isActive
               ? AppTheme.primaryColor.withOpacity(0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
@@ -104,21 +96,15 @@ class BottomNavBar extends StatelessWidget {
           children: [
             Icon(
               isActive ? activeIcon : icon,
-              color: isActive 
-                  ? AppTheme.primaryColor
-                  : AppTheme.textLight,
+              color: isActive ? AppTheme.primaryColor : AppTheme.textLight,
               size: isSmallScreen ? 20 : 22,
             ),
             SizedBox(height: isSmallScreen ? 2 : 4),
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: isActive 
-                    ? AppTheme.primaryColor
-                    : AppTheme.textLight,
-                fontWeight: isActive 
-                    ? FontWeight.w600
-                    : FontWeight.normal,
+                color: isActive ? AppTheme.primaryColor : AppTheme.textLight,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 fontSize: isSmallScreen ? 10 : 12,
               ),
               textAlign: TextAlign.center,
@@ -130,4 +116,4 @@ class BottomNavBar extends StatelessWidget {
       ),
     );
   }
-} 
+}

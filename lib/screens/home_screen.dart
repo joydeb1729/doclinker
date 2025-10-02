@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../widgets/main_layout.dart';
 import '../pages/assistant_page.dart';
 import '../pages/appointments_page.dart';
-import '../pages/history_page.dart';
 import '../pages/nearby_page.dart';
 import '../controllers/location_controller.dart';
 
@@ -34,9 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
       pages: [
         AssistantPage(locationController: _locationController),
         AppointmentsPage(),
-        HistoryPage(),
         NearbyPage(locationController: _locationController),
       ],
     );
   }
-} 
+}
