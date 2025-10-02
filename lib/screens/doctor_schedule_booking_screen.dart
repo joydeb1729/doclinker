@@ -300,8 +300,8 @@ class _DoctorScheduleBookingScreenState
               (date) => Tab(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 6,
+                    vertical: 2,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -309,15 +309,15 @@ class _DoctorScheduleBookingScreenState
                       Text(
                         _getDayName(date.weekday),
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         date.day.toString(),
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

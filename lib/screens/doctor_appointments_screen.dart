@@ -145,11 +145,46 @@ class _DoctorAppointmentsScreenState
     AppointmentStatus newStatus,
   ) async {
     try {
+      // Show loading state
+      setState(() {
+        _isLoading = true;
+      });
+
       await appointment_service.AppointmentService.updateAppointmentStatus(
         appointment.id,
         newStatus,
         note: 'Status updated by doctor',
       );
+
+      // Update local appointment status immediately
+      final updatedAppointments = _appointments.map((apt) {
+        if (apt.id == appointment.id) {
+          return Appointment(
+            id: apt.id,
+            patientId: apt.patientId,
+            patientName: apt.patientName,
+            doctorId: apt.doctorId,
+            doctorName: apt.doctorName,
+            appointmentDate: apt.appointmentDate,
+            timeSlot: apt.timeSlot,
+            status: newStatus, // Update status
+            type: apt.type,
+            reason: apt.reason,
+            symptoms: apt.symptoms,
+            fee: apt.fee,
+            isPaid: apt.isPaid,
+            createdAt: apt.createdAt,
+            updatedAt: DateTime.now(),
+            notes: apt.notes,
+          );
+        }
+        return apt;
+      }).toList();
+
+      setState(() {
+        _appointments = updatedAppointments;
+        _isLoading = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -158,9 +193,14 @@ class _DoctorAppointmentsScreenState
         ),
       );
 
-      _loadAppointments();
-      _loadStatistics();
+      // Reload from server to ensure consistency
+      await _loadAppointments();
+      await _loadStatistics();
     } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update appointment: $e'),
@@ -177,6 +217,35 @@ class _DoctorAppointmentsScreenState
         true,
       );
 
+      // Update local appointment payment status immediately
+      final updatedAppointments = _appointments.map((apt) {
+        if (apt.id == appointment.id) {
+          return Appointment(
+            id: apt.id,
+            patientId: apt.patientId,
+            patientName: apt.patientName,
+            doctorId: apt.doctorId,
+            doctorName: apt.doctorName,
+            appointmentDate: apt.appointmentDate,
+            timeSlot: apt.timeSlot,
+            status: apt.status,
+            type: apt.type,
+            reason: apt.reason,
+            symptoms: apt.symptoms,
+            fee: apt.fee,
+            isPaid: true, // Update payment status
+            createdAt: apt.createdAt,
+            updatedAt: DateTime.now(),
+            notes: apt.notes,
+          );
+        }
+        return apt;
+      }).toList();
+
+      setState(() {
+        _appointments = updatedAppointments;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Payment status updated to Paid'),
@@ -184,8 +253,9 @@ class _DoctorAppointmentsScreenState
         ),
       );
 
-      _loadAppointments();
-      _loadStatistics();
+      // Reload from server to ensure consistency
+      await _loadAppointments();
+      await _loadStatistics();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
