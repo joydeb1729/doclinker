@@ -383,7 +383,7 @@ class _DoctorAppointmentScreenState
               _buildDetailRow('Time', appointment.timeSlot),
               _buildDetailRow('Type', appointment.type.name.toUpperCase()),
               _buildDetailRow('Status', appointment.status.name.toUpperCase()),
-              _buildDetailRow('Fee', '\$${appointment.fee.toStringAsFixed(2)}'),
+              _buildDetailRow('Fee', '৳${appointment.fee.toStringAsFixed(2)}'),
 
               if (appointment.symptoms?.isNotEmpty == true) ...[
                 const SizedBox(height: 8),
@@ -663,7 +663,7 @@ class _DoctorAppointmentScreenState
                       color: AppTheme.textSecondary,
                     ),
                     Text(
-                      '\$${appointment.fee.toStringAsFixed(2)}',
+                      '৳${appointment.fee.toStringAsFixed(2)}',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 13,

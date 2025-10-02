@@ -193,7 +193,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
                 ),
                 Text('Time: $_selectedTimeSlot'),
                 Text(
-                  'Fee: \$${widget.doctor.consultationFee.toStringAsFixed(2)}',
+                  'Fee: ৳${widget.doctor.consultationFee.toStringAsFixed(2)}',
                 ),
               ],
             ),
@@ -350,7 +350,7 @@ class _BookAppointmentScreenState extends ConsumerState<BookAppointmentScreen> {
               Icon(Icons.attach_money, color: AppTheme.textSecondary, size: 16),
               const SizedBox(width: 4),
               Text(
-                '\$${widget.doctor.consultationFee}',
+                '৳${widget.doctor.consultationFee}',
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             ],

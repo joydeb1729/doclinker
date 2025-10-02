@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../app_theme.dart';
 import '../../models/doctor_profile.dart';
+import '../../models/appointment.dart' show Appointment;
 import '../../providers/auth_provider.dart';
 import '../../services/navigation_service.dart';
+import '../../services/appointment_service.dart' as appointment_service;
 import '../doctor_appointments_screen.dart';
 
 class DoctorDashboard extends ConsumerStatefulWidget {
@@ -18,11 +20,15 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
   int _selectedIndex = 0;
   DoctorProfile? _doctorProfile;
   bool _isLoading = true;
+  Map<String, int> _appointmentStats = {};
+  Map<String, double> _revenueStats = {};
+  List<Appointment> _todayAppointments = [];
 
   @override
   void initState() {
     super.initState();
     _loadDoctorProfile();
+    _loadDashboardData();
   }
 
   Future<void> _loadDoctorProfile() async {
@@ -43,6 +49,78 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
         print('Error loading doctor profile: $e');
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadDashboardData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('❌ No authenticated user found for dashboard');
+      return;
+    }
+
+    try {
+      print('🏥 Loading dashboard data for doctor: ${user.uid}');
+
+      // Load appointment statistics with fallback
+      final appointmentStats = await appointment_service
+          .AppointmentService.getDoctorAppointmentStats(user.uid);
+      final revenueStats = await appointment_service
+          .AppointmentService.getDoctorRevenueStats(user.uid);
+
+      // Load today's appointments
+      final today = DateTime.now();
+      final todayAppointments = await appointment_service
+          .AppointmentService.getDoctorAppointmentsByDate(user.uid, today);
+
+      print(
+        '✅ Dashboard loaded successfully - Total appointments: ${appointmentStats['total'] ?? 'Unknown'}',
+      );
+
+      if (mounted) {
+        setState(() {
+          // Ensure we have valid data with fallbacks
+          _appointmentStats = {
+            'total': appointmentStats['total'] ?? 0,
+            'todayCount': appointmentStats['todayCount'] ?? 0,
+            'thisWeek': appointmentStats['thisWeek'] ?? 0,
+            'monthlyCount': appointmentStats['monthlyCount'] ?? 0,
+            'pendingCount': appointmentStats['pendingCount'] ?? 0,
+            'confirmed': appointmentStats['confirmed'] ?? 0,
+            'completedCount': appointmentStats['completedCount'] ?? 0,
+          };
+          _revenueStats = {
+            'total': revenueStats['total'] ?? 0.0,
+            'todayRevenue': revenueStats['todayRevenue'] ?? 0.0,
+            'weeklyRevenue': revenueStats['weeklyRevenue'] ?? 0.0,
+            'monthlyRevenue': revenueStats['monthlyRevenue'] ?? 0.0,
+          };
+          _todayAppointments = todayAppointments;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading dashboard data: $e');
+      // Set empty data on error
+      if (mounted) {
+        setState(() {
+          _appointmentStats = {
+            'total': 0,
+            'todayCount': 0,
+            'thisWeek': 0,
+            'monthlyCount': 0,
+            'pendingCount': 0,
+            'confirmed': 0,
+            'completedCount': 0,
+          };
+          _revenueStats = {
+            'total': 0.0,
+            'todayRevenue': 0.0,
+            'weeklyRevenue': 0.0,
+            'monthlyRevenue': 0.0,
+          };
+          _todayAppointments = [];
         });
       }
     }
@@ -73,6 +151,11 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadDashboardData,
+                tooltip: 'Refresh Data',
+              ),
               IconButton(
                 icon: const Icon(Icons.notifications_outlined),
                 onPressed: () {
@@ -252,7 +335,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Today\'s Appointments',
-                '8',
+                '${_appointmentStats['todayCount'] ?? 0}',
                 Icons.calendar_today,
                 AppTheme.primaryColor,
               ),
@@ -260,8 +343,8 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             const SizedBox(width: 16),
             Expanded(
               child: _buildStatCard(
-                'Total Patients',
-                '${_doctorProfile?.totalPatients ?? 0}',
+                'Total Appointments',
+                '${_appointmentStats['total'] ?? 0}',
                 Icons.people,
                 Colors.green,
               ),
@@ -273,9 +356,9 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           children: [
             Expanded(
               child: _buildStatCard(
-                'Average Rating',
-                '${_doctorProfile?.averageRating.toStringAsFixed(1) ?? '0.0'}⭐',
-                Icons.star,
+                'Pending',
+                '${_appointmentStats['pendingCount'] ?? 0}',
+                Icons.pending_actions,
                 Colors.orange,
               ),
             ),
@@ -283,7 +366,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Revenue (Month)',
-                '\$2,850',
+                '৳${(_revenueStats['monthlyRevenue'] ?? 0.0).toStringAsFixed(0)}',
                 Icons.attach_money,
                 Colors.blue,
               ),
@@ -352,26 +435,48 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           ],
         ),
         const SizedBox(height: 16),
-        _buildAppointmentCard(
-          'John Doe',
-          '10:00 AM',
-          'Regular Checkup',
-          'pending',
-        ),
-        const SizedBox(height: 8),
-        _buildAppointmentCard(
-          'Jane Smith',
-          '11:30 AM',
-          'Follow-up Visit',
-          'confirmed',
-        ),
-        const SizedBox(height: 8),
-        _buildAppointmentCard(
-          'Mike Johnson',
-          '02:00 PM',
-          'Consultation',
-          'in-progress',
-        ),
+        if (_todayAppointments.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 48,
+                    color: AppTheme.textSecondary,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No appointments today',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._todayAppointments
+              .take(3)
+              .map(
+                (appointment) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildAppointmentCard(
+                    appointment.patientName,
+                    appointment.timeSlot,
+                    appointment.reason ?? 'Consultation',
+                    appointment.status.name,
+                  ),
+                ),
+              ),
       ],
     );
   }
@@ -472,7 +577,7 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Recent Activity',
+          'Appointment Summary',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
@@ -486,24 +591,24 @@ class _DoctorDashboardState extends ConsumerState<DoctorDashboard> {
           child: Column(
             children: [
               _buildActivityItem(
-                'New appointment booked',
-                'Sarah Wilson - Tomorrow 3:00 PM',
-                Icons.calendar_today,
-                '5 min ago',
+                'Completed Appointments',
+                '${_appointmentStats['completedCount'] ?? 0} appointments finished',
+                Icons.check_circle,
+                'Total',
               ),
               const Divider(),
               _buildActivityItem(
-                'Patient review received',
-                'John Doe rated you 5 stars',
-                Icons.star,
-                '1 hour ago',
+                'Confirmed Appointments',
+                '${_appointmentStats['confirmed'] ?? 0} appointments scheduled',
+                Icons.calendar_month,
+                'Upcoming',
               ),
               const Divider(),
               _buildActivityItem(
-                'Profile updated',
-                'Availability hours modified',
-                Icons.edit,
-                '2 hours ago',
+                'This Week Revenue',
+                '৳${(_revenueStats['weeklyRevenue'] ?? 0.0).toStringAsFixed(2)}',
+                Icons.monetization_on,
+                'Earnings',
               ),
             ],
           ),

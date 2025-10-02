@@ -330,7 +330,7 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
               ),
               const Spacer(),
               Text(
-                '\$${doctor.consultationFee}',
+                '৳${doctor.consultationFee}',
                 style: TextStyle(
                   color: AppTheme.primaryColor,
                   fontWeight: FontWeight.bold,

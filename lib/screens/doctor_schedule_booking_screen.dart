@@ -247,7 +247,7 @@ class _DoctorScheduleBookingScreenState
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\$${widget.doctor.consultationFee.toStringAsFixed(0)} per consultation',
+                      '৳${widget.doctor.consultationFee.toStringAsFixed(0)} per consultation',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -446,7 +446,7 @@ class _DoctorScheduleBookingScreenState
                             child: Text(
                               isBooked
                                   ? 'Booked'
-                                  : '\$${slot.fee.toStringAsFixed(0)}',
+                                  : '৳${slot.fee.toStringAsFixed(0)}',
                               style: TextStyle(
                                 fontSize: 9,
                                 color: isBooked
@@ -529,7 +529,7 @@ class _DoctorScheduleBookingScreenState
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '\$${_selectedSlot!.fee.toStringAsFixed(0)}',
+                  '৳${_selectedSlot!.fee.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

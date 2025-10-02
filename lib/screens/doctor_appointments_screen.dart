@@ -697,7 +697,7 @@ class _DoctorAppointmentsScreenState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Fee: \$${appointment.fee.toStringAsFixed(2)}',
+                      'Fee: ৳${appointment.fee.toStringAsFixed(2)}',
                       style: const TextStyle(fontWeight: FontWeight.w500),
                       overflow: TextOverflow.ellipsis,
                     ),

@@ -316,7 +316,7 @@ class _PatientAppointmentsScreenState
                   Icon(Icons.payment, size: 16, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
                   Text(
-                    'Fee: \$${appointment.fee.toStringAsFixed(2)}',
+                    'Fee: ৳${appointment.fee.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(width: 8),

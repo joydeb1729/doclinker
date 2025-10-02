@@ -171,7 +171,7 @@ class EnhancedDoctorCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '\$${doctor.consultationFee.toStringAsFixed(0)}',
+                    '৳${doctor.consultationFee.toStringAsFixed(0)}',
                     style: TextStyle(
                       color: Colors.green.shade700,
                       fontWeight: FontWeight.bold,

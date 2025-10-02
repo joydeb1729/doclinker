@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/appointment.dart';
 import '../models/doctor_profile.dart';
+import '../models/patient_profile.dart';
 
-// Simple UserProfile class for appointments
+// Simple UserProfile class for appointments (kept for backward compatibility)
 class UserProfile {
   final String uid;
   final String name;
@@ -50,23 +51,40 @@ class AppointmentService {
   }) async {
     try {
       // Get patient and doctor information
-      final patientDoc = await _firestore
-          .collection(_usersCollection)
+      // First try to get patient from patient_profiles collection
+      final patientProfileDoc = await _firestore
+          .collection('patient_profiles')
           .doc(patientId)
           .get();
+
+      String patientName;
+      if (patientProfileDoc.exists) {
+        final patientProfile = PatientProfile.fromFirestore(patientProfileDoc);
+        patientName = patientProfile.fullName;
+      } else {
+        // Fall back to users collection for backward compatibility
+        final patientDoc = await _firestore
+            .collection(_usersCollection)
+            .doc(patientId)
+            .get();
+
+        if (!patientDoc.exists) {
+          throw Exception('Patient profile not found');
+        }
+
+        final userProfile = UserProfile.fromFirestore(patientDoc);
+        patientName = userProfile.name;
+      }
+
       final doctorDoc = await _firestore
           .collection(_doctorProfilesCollection)
           .doc(doctorId)
           .get();
 
-      if (!patientDoc.exists) {
-        throw Exception('Patient profile not found');
-      }
       if (!doctorDoc.exists) {
         throw Exception('Doctor profile not found');
       }
 
-      final patientProfile = UserProfile.fromFirestore(patientDoc);
       final doctorProfile = DoctorProfile.fromFirestore(doctorDoc);
 
       // Check if time slot is available
@@ -88,7 +106,7 @@ class AppointmentService {
         doctorId: doctorId,
         patientId: patientId,
         doctorName: doctorProfile.fullName,
-        patientName: patientProfile.name,
+        patientName: patientName,
         appointmentDate: appointmentDate,
         timeSlot: timeSlot,
         type: type,
@@ -434,12 +452,132 @@ class AppointmentService {
     String doctorId,
   ) async {
     try {
+      // Validate doctor ID
+      if (doctorId.isEmpty) {
+        print('❌ Empty doctor ID provided');
+        return {
+          'total': 0,
+          'todayCount': 0,
+          'thisWeek': 0,
+          'monthlyCount': 0,
+          'pendingCount': 0,
+          'confirmed': 0,
+          'completedCount': 0,
+        };
+      }
+
       final querySnapshot = await _firestore
           .collection(_appointmentsCollection)
           .where('doctorId', isEqualTo: doctorId)
           .get();
 
-      final appointments = querySnapshot.docs
+      if (querySnapshot.docs.isEmpty) {
+        print('ℹ️ No appointments found for doctor: $doctorId');
+        return {
+          'total': 0,
+          'todayCount': 0,
+          'thisWeek': 0,
+          'monthlyCount': 0,
+          'pendingCount': 0,
+          'confirmed': 0,
+          'completedCount': 0,
+        };
+      }
+
+      final appointments = <Appointment>[];
+      for (final doc in querySnapshot.docs) {
+        try {
+          final data = doc.data();
+          print(
+            '📋 Processing appointment ${doc.id} - doctorId: ${data['doctorId']}',
+          );
+
+          final appointment = Appointment.fromFirestore(doc);
+          appointments.add(appointment);
+        } catch (e) {
+          print('⚠️ Failed to parse appointment ${doc.id}: $e');
+          // Continue processing other appointments
+        }
+      }
+
+      print(
+        '📊 Successfully parsed ${appointments.length} appointments from ${querySnapshot.docs.length} documents',
+      );
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfWeek = startOfWeek.add(const Duration(days: 7));
+      final endOfMonth = DateTime(now.year, now.month + 1, 1);
+
+      // Count today's appointments
+      final todayAppointments = appointments.where((a) {
+        final appointmentDay = DateTime(
+          a.appointmentDate.year,
+          a.appointmentDate.month,
+          a.appointmentDate.day,
+        );
+        return appointmentDay.isAtSameMomentAs(today);
+      }).length;
+
+      // Count this week's appointments
+      final weeklyAppointments = appointments.where((a) {
+        return a.appointmentDate.isAfter(
+              startOfWeek.subtract(const Duration(days: 1)),
+            ) &&
+            a.appointmentDate.isBefore(endOfWeek);
+      }).length;
+
+      // Count this month's appointments
+      final monthlyAppointments = appointments.where((a) {
+        return a.appointmentDate.isAfter(
+              startOfMonth.subtract(const Duration(days: 1)),
+            ) &&
+            a.appointmentDate.isBefore(endOfMonth);
+      }).length;
+
+      // Count by status
+      final pendingCount = appointments
+          .where((a) => a.status == AppointmentStatus.pending)
+          .length;
+      final confirmedCount = appointments
+          .where((a) => a.status == AppointmentStatus.confirmed)
+          .length;
+      final completedCount = appointments
+          .where((a) => a.status == AppointmentStatus.completed)
+          .length;
+
+      final stats = {
+        'total': appointments.length,
+        'todayCount': todayAppointments,
+        'thisWeek': weeklyAppointments,
+        'monthlyCount': monthlyAppointments,
+        'pendingCount': pendingCount,
+        'confirmed': confirmedCount,
+        'completedCount': completedCount,
+      };
+
+      print('✅ Appointment statistics calculated: $stats');
+      return stats;
+    } catch (e) {
+      print('❌ Error getting appointment stats: $e');
+      return {};
+    }
+  }
+
+  /// Get revenue statistics for doctor dashboard
+  static Future<Map<String, double>> getDoctorRevenueStats(
+    String doctorId,
+  ) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_appointmentsCollection)
+          .where('doctorId', isEqualTo: doctorId)
+          .where('isPaid', isEqualTo: true)
+          .get();
+
+      final paidAppointments = querySnapshot.docs
           .map((doc) => Appointment.fromFirestore(doc))
           .toList();
 
@@ -450,37 +588,35 @@ class AppointmentService {
       );
       final startOfMonth = DateTime(today.year, today.month, 1);
 
-      final todayAppointments = appointments
+      final todayRevenue = paidAppointments
           .where(
             (a) =>
                 a.appointmentDate.isAfter(startOfToday) &&
                 a.appointmentDate.isBefore(startOfToday.add(Duration(days: 1))),
           )
-          .length;
+          .fold<double>(0.0, (sum, appointment) => sum + appointment.fee);
 
-      final monthlyAppointments = appointments
+      final weeklyRevenue = paidAppointments
+          .where((a) => a.appointmentDate.isAfter(startOfWeek))
+          .fold<double>(0.0, (sum, appointment) => sum + appointment.fee);
+
+      final monthlyRevenue = paidAppointments
           .where((a) => a.appointmentDate.isAfter(startOfMonth))
-          .length;
+          .fold<double>(0.0, (sum, appointment) => sum + appointment.fee);
+
+      final totalRevenue = paidAppointments.fold<double>(
+        0.0,
+        (sum, appointment) => sum + appointment.fee,
+      );
 
       return {
-        'total': appointments.length,
-        'todayCount': todayAppointments,
-        'thisWeek': appointments
-            .where((a) => a.appointmentDate.isAfter(startOfWeek))
-            .length,
-        'monthlyCount': monthlyAppointments,
-        'pendingCount': appointments
-            .where((a) => a.status == AppointmentStatus.pending)
-            .length,
-        'confirmed': appointments
-            .where((a) => a.status == AppointmentStatus.confirmed)
-            .length,
-        'completedCount': appointments
-            .where((a) => a.status == AppointmentStatus.completed)
-            .length,
+        'total': totalRevenue,
+        'todayRevenue': todayRevenue,
+        'weeklyRevenue': weeklyRevenue,
+        'monthlyRevenue': monthlyRevenue,
       };
     } catch (e) {
-      print('❌ Error getting appointment stats: $e');
+      print('❌ Error getting revenue stats: $e');
       return {};
     }
   }
