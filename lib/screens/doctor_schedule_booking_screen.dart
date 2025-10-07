@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../app_theme.dart';
 import '../services/doctor_matching_service.dart';
 import '../services/doctor_availability_service.dart';
+import '../services/hospital_details_service.dart';
+import '../controllers/location_controller.dart';
 import '../models/appointment.dart';
 
 class DoctorScheduleBookingScreen extends ConsumerStatefulWidget {
@@ -28,11 +30,17 @@ class _DoctorScheduleBookingScreenState
   final TextEditingController _reasonController = TextEditingController();
   AppointmentType _selectedAppointmentType = AppointmentType.consultation;
 
+  // Enhanced doctor and hospital information
+  DoctorBookingInfo? _doctorBookingInfo;
+  bool _loadingDoctorInfo = true;
+  final LocationController _locationController = LocationController();
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 7, vsync: this);
     _loadWeeklySchedule();
+    _loadDoctorInfo();
   }
 
   @override
@@ -40,6 +48,37 @@ class _DoctorScheduleBookingScreenState
     _tabController.dispose();
     _reasonController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDoctorInfo() async {
+    setState(() {
+      _loadingDoctorInfo = true;
+    });
+
+    try {
+      // Get user's current location for distance calculation
+      await _locationController.useMyLocation();
+
+      // Load enhanced doctor and hospital information
+      _doctorBookingInfo = await HospitalDetailsService.getDoctorBookingInfo(
+        doctor: widget.doctor,
+        userLocation: _locationController.userLocation,
+      );
+    } catch (e) {
+      // Create fallback info
+      _doctorBookingInfo = DoctorBookingInfo(
+        doctor: widget.doctor,
+        hospitalDetails: null,
+        realTimeDistance: widget.doctor.distance,
+        userLocation: null,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingDoctorInfo = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadWeeklySchedule() async {
@@ -68,7 +107,6 @@ class _DoctorScheduleBookingScreenState
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading weekly schedule: $e');
       setState(() {
         _isLoading = false;
       });
@@ -167,35 +205,49 @@ class _DoctorScheduleBookingScreenState
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildDoctorInfo(),
-                _buildDateTabs(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: _selectedSlot != null
-                              ? 300
-                              : 500, // Adjust height based on booking section
-                          child: _buildScheduleView(),
-                        ),
-                        if (_selectedSlot != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: _buildBookingSection(),
-                          ),
-                      ],
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildDoctorInfo(),
+                  _buildDateTabs(),
+                  _buildScheduleView(),
+                  if (_selectedSlot != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: _buildBookingSection(),
                     ),
-                  ),
-                ),
-              ],
+                  const SizedBox(height: 24), // Bottom padding for better UX
+                ],
+              ),
             ),
     );
   }
 
   Widget _buildDoctorInfo() {
+    if (_loadingDoctorInfo) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final doctorInfo = _doctorBookingInfo;
+    if (doctorInfo == null) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -213,16 +265,17 @@ class _DoctorScheduleBookingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Doctor Basic Info
           Row(
             children: [
               CircleAvatar(
-                radius: 30,
+                radius: 35,
                 backgroundColor: AppTheme.primaryColor,
                 child: Text(
                   widget.doctor.name.substring(0, 2).toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -235,41 +288,264 @@ class _DoctorScheduleBookingScreenState
                     Text(
                       widget.doctor.name,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.textPrimary,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.doctor.specialty,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '৳${widget.doctor.consultationFee.toStringAsFixed(0)} per consultation',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (widget.doctor.subSpecialties.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.doctor.subSpecialties.join(', '),
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.star, size: 16, color: Colors.amber[700]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${widget.doctor.rating.toStringAsFixed(1)} (${widget.doctor.reviewCount} reviews)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+
+          // Hospital Information
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.local_hospital,
+                color: AppTheme.primaryColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hospital',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      doctorInfo.hospitalName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (doctorInfo.hasHospitalDetails) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        doctorInfo.hospitalAddress,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              doctorInfo.hospitalPhone,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Experience & Distance Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoCard(
+                  icon: Icons.work_outline,
+                  title: 'Experience',
+                  value: '${widget.doctor.yearsExperience} years',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildInfoCard(
+                  icon: Icons.location_on_outlined,
+                  title: 'Distance',
+                  value: doctorInfo.realTimeDistance,
+                  valueColor: AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Fee & Education Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoCard(
+                  icon: Icons.payment_outlined,
+                  title: 'Consultation Fee',
+                  value: '৳${widget.doctor.consultationFee.toStringAsFixed(0)}',
+                  valueColor: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildInfoCard(
+                  icon: Icons.school_outlined,
+                  title: 'Education',
+                  value: widget.doctor.education,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Availability Status
           Container(
-            padding: const EdgeInsets.all(8),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: widget.doctor.availableToday
+                  ? Colors.green.withOpacity(0.1)
+                  : Colors.orange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: widget.doctor.availableToday
+                    ? Colors.green.withOpacity(0.3)
+                    : Colors.orange.withOpacity(0.3),
+              ),
             ),
-            child: const Text(
-              'ℹ️ Times and prices shown are from doctor\'s profile',
-              style: TextStyle(fontSize: 12, color: AppTheme.primaryColor),
+            child: Row(
+              children: [
+                Icon(
+                  widget.doctor.availableToday
+                      ? Icons.check_circle_outline
+                      : Icons.schedule_outlined,
+                  color: widget.doctor.availableToday
+                      ? Colors.green[700]
+                      : Colors.orange[700],
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.doctor.availableToday
+                        ? 'Available Today'
+                        : 'Limited Availability',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: widget.doctor.availableToday
+                          ? Colors.green[700]
+                          : Colors.orange[700],
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? AppTheme.textPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

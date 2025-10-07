@@ -5,14 +5,8 @@ import '../services/doctor_matching_service.dart';
 class EnhancedDoctorCard extends StatelessWidget {
   final MatchedDoctor doctor;
   final VoidCallback? onBookTap;
-  final VoidCallback? onDetailsTap;
 
-  const EnhancedDoctorCard({
-    super.key,
-    required this.doctor,
-    this.onBookTap,
-    this.onDetailsTap,
-  });
+  const EnhancedDoctorCard({super.key, required this.doctor, this.onBookTap});
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +124,7 @@ class EnhancedDoctorCard extends StatelessWidget {
                 Icon(Icons.star, color: Colors.amber, size: 16),
                 const SizedBox(width: 4),
                 Text(
-                  '${doctor.rating}',
+                  '${doctor.rating.toStringAsFixed(1)}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
@@ -232,47 +226,22 @@ class EnhancedDoctorCard extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onDetailsTap,
-                    icon: const Icon(Icons.info_outline, size: 16),
-                    label: const Text(
-                      'Details',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+            // Action button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onBookTap,
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: const Text('Book Now', style: TextStyle(fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onBookTap,
-                    icon: const Icon(Icons.calendar_today, size: 16),
-                    label: const Text(
-                      'Book Now',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),

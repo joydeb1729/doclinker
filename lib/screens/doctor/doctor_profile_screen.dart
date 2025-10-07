@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/navigation_service.dart';
 import '../../services/profile_validation_service.dart';
 import '../../services/embedding_service.dart';
+import '../../constants/hospital_constants.dart';
 
 class DoctorProfileScreen extends ConsumerStatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -21,12 +22,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _licenseController = TextEditingController();
-  final _hospitalController = TextEditingController();
+  final _hospitalController =
+      TextEditingController(); // Keep for backward compatibility
   final _degreeController = TextEditingController();
   final _experienceController = TextEditingController();
   final _feeController = TextEditingController();
   final _addressController = TextEditingController();
   final _clinicPhoneController = TextEditingController();
+
+  // Hospital dropdown state
+  String? _selectedHospital;
 
   DoctorProfile? _doctorProfile;
   bool _isLoading = true;
@@ -99,6 +104,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     _feeController.dispose();
     _addressController.dispose();
     _clinicPhoneController.dispose();
+
     super.dispose();
   }
 
@@ -126,11 +132,97 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     }
   }
 
+  /// Find the best matching hospital from our predefined list
+  String? _findMatchingHospital(String originalHospital) {
+    if (originalHospital.isEmpty) return null;
+
+    // First, check for exact match
+    if (HospitalConstants.bangladeshHospitals.contains(originalHospital)) {
+      return originalHospital;
+    }
+
+    // Normalize both strings for comparison
+    final lowerOriginal = originalHospital.toLowerCase().trim();
+
+    // Look for the best match using more precise criteria
+    String? bestMatch;
+    int highestScore = 0;
+
+    for (String hospital in HospitalConstants.bangladeshHospitals) {
+      final lowerHospital = hospital.toLowerCase().trim();
+      int score = 0;
+
+      // Calculate similarity score based on multiple factors
+
+      // 1. Check for high similarity in core hospital name (before comma)
+      final originalCore = lowerOriginal.split(',')[0].trim();
+      final hospitalCore = lowerHospital.split(',')[0].trim();
+
+      // 2. Handle common typos and variations
+      String normalizedOriginal = originalCore
+          .replaceAll('collage', 'college') // Fix common typo
+          .replaceAll('  ', ' ') // Remove double spaces
+          .replaceAll(RegExp(r'\s+'), ' '); // Normalize whitespace
+
+      String normalizedHospital = hospitalCore
+          .replaceAll('  ', ' ')
+          .replaceAll(RegExp(r'\s+'), ' ');
+
+      // 3. Check for exact match after normalization
+      if (normalizedOriginal == normalizedHospital) {
+        score = 100; // Perfect match
+      }
+      // 4. Check if one is contained in the other (high confidence)
+      else if (normalizedHospital.contains(normalizedOriginal) ||
+          normalizedOriginal.contains(normalizedHospital)) {
+        score = 80;
+      }
+      // 5. Check for substantial word overlap
+      else {
+        final originalWords = normalizedOriginal
+            .split(' ')
+            .where((w) => w.length > 2)
+            .toSet();
+        final hospitalWords = normalizedHospital
+            .split(' ')
+            .where((w) => w.length > 2)
+            .toSet();
+        final intersection = originalWords.intersection(hospitalWords);
+
+        if (intersection.length >= 2 &&
+            intersection.length >= originalWords.length * 0.6) {
+          score = 60;
+        }
+      }
+
+      // Update best match if this score is higher
+      if (score > highestScore && score >= 60) {
+        // Minimum threshold of 60
+        highestScore = score;
+        bestMatch = hospital;
+      }
+    }
+
+    return bestMatch;
+  }
+
   void _populateFields(DoctorProfile profile) {
     _nameController.text = profile.fullName;
     _phoneController.text = profile.phoneNumber ?? '';
     _licenseController.text = profile.medicalLicense;
-    _hospitalController.text = profile.hospitalAffiliation;
+
+    // Handle hospital affiliation - validate against our predefined list
+    if (profile.hospitalAffiliation.isNotEmpty) {
+      _selectedHospital = _findMatchingHospital(profile.hospitalAffiliation);
+
+      // Log if we had to do fallback matching
+      if (_selectedHospital != profile.hospitalAffiliation) {
+        print(
+          '🏥 Hospital mapping: "${profile.hospitalAffiliation}" -> "$_selectedHospital"',
+        );
+      }
+    }
+
     _degreeController.text = profile.medicalDegree;
     _experienceController.text = profile.yearsOfExperience.toString();
     _feeController.text = profile.consultationFee.toString();
@@ -181,7 +273,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     ? null
                     : _phoneController.text.trim(),
                 medicalLicense: _licenseController.text.trim(),
-                hospitalAffiliation: _hospitalController.text.trim(),
+                hospitalAffiliation: _selectedHospital ?? '',
                 medicalDegree: _degreeController.text.trim(),
                 yearsOfExperience:
                     int.tryParse(_experienceController.text) ?? 0,
@@ -478,18 +570,65 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           },
         ),
         const SizedBox(height: 16),
-        TextFormField(
-          controller: _hospitalController,
-          decoration: const InputDecoration(
-            labelText: 'Hospital/Clinic Affiliation*',
-            prefixIcon: Icon(Icons.local_hospital_outlined),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Hospital affiliation is required';
-            }
-            return null;
-          },
+        // Hospital Dropdown with Search
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Hospital/Clinic Affiliation*',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButtonFormField<String>(
+                value: _selectedHospital,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.local_hospital_outlined),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  hintText: 'Select Hospital/Clinic',
+                ),
+                isExpanded: true,
+                items: HospitalConstants.bangladeshHospitals.map((
+                  String hospital,
+                ) {
+                  return DropdownMenuItem<String>(
+                    value: hospital,
+                    child: Text(
+                      hospital,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedHospital = newValue;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Hospital affiliation is required';
+                  }
+                  return null;
+                },
+                dropdownColor: Colors.white,
+                iconSize: 24,
+                style: const TextStyle(color: Colors.black87, fontSize: 16),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         TextFormField(
