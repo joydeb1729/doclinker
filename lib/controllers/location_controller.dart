@@ -15,6 +15,10 @@ class LocationController extends ChangeNotifier {
   String _selectedSpecialty = 'All';
   String _searchMode = 'doctors'; // 'doctors', 'hospitals', 'both'
 
+  // Location-based hospital filtering
+  List<HospitalProfile> _selectedLocationHospitals = [];
+  LocationResult? _selectedLocation;
+
   // Getters
   DoctorProfile? get selectedDoctor => _selectedDoctor;
   HospitalProfile? get selectedHospital => _selectedHospital;
@@ -26,6 +30,9 @@ class LocationController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String get selectedSpecialty => _selectedSpecialty;
   String get searchMode => _searchMode;
+  List<HospitalProfile> get selectedLocationHospitals =>
+      _selectedLocationHospitals;
+  LocationResult? get selectedLocation => _selectedLocation;
 
   // Set selected doctor
   void setSelectedDoctor(DoctorProfile doctor) {
@@ -303,5 +310,52 @@ class LocationController extends ChangeNotifier {
   // Open app settings for permissions
   Future<void> openAppSettings() async {
     await LocationService.openAppSettings();
+  }
+
+  // Set selected location and load hospitals in that area
+  Future<void> setSelectedLocation(
+    LocationResult location,
+    double radiusKm,
+  ) async {
+    _selectedLocation = location;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Load hospitals in the selected location area
+      _selectedLocationHospitals = await LocationService.getNearbyHospitals(
+        location.latitude,
+        location.longitude,
+        radiusInKm: radiusKm,
+      );
+
+      print(
+        'LocationController: Found ${_selectedLocationHospitals.length} hospitals in selected area',
+      );
+    } catch (e) {
+      _errorMessage =
+          'Error loading hospitals in selected area: ${e.toString()}';
+      _selectedLocationHospitals = [];
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Clear selected location
+  void clearSelectedLocation() {
+    _selectedLocation = null;
+    _selectedLocationHospitals = [];
+    notifyListeners();
+  }
+
+  // Check if location-based filtering is active
+  bool get isLocationFilterActive =>
+      _selectedLocation != null && _selectedLocationHospitals.isNotEmpty;
+
+  // Get hospital names from selected location for doctor filtering
+  List<String> getSelectedLocationHospitalNames() {
+    return _selectedLocationHospitals.map((h) => h.name).toList();
   }
 }
