@@ -1,174 +1,307 @@
 import 'package:flutter/material.dart';
-
-class Hospital {
-  final String id;
-  final String name;
-  final String address;
-  final double distance; // in km
-  final List<String> specialties;
-  final double rating;
-  final bool isAvailable;
-
-  Hospital({
-    required this.id,
-    required this.name,
-    required this.address,
-    required this.distance,
-    required this.specialties,
-    required this.rating,
-    required this.isAvailable,
-  });
-}
+import '../models/doctor_profile.dart';
+import '../models/hospital_profile.dart';
+import '../services/location_service.dart';
 
 class LocationController extends ChangeNotifier {
-  Hospital? _selectedHospital;
-  String? _userLocation;
-  List<Hospital> _recentHospitals = [];
-  List<Hospital> _nearbyHospitals = [];
+  DoctorProfile? _selectedDoctor;
+  HospitalProfile? _selectedHospital;
+  LocationResult? _userLocation;
+  List<DoctorProfile> _recentDoctors = [];
+  List<DoctorProfile> _nearbyDoctors = [];
+  List<HospitalProfile> _nearbyHospitals = [];
   bool _isLoading = false;
+  String? _errorMessage;
+  String _selectedSpecialty = 'All';
+  String _searchMode = 'doctors'; // 'doctors', 'hospitals', 'both'
 
   // Getters
-  Hospital? get selectedHospital => _selectedHospital;
-  String? get userLocation => _userLocation;
-  List<Hospital> get recentHospitals => _recentHospitals;
-  List<Hospital> get nearbyHospitals => _nearbyHospitals;
+  DoctorProfile? get selectedDoctor => _selectedDoctor;
+  HospitalProfile? get selectedHospital => _selectedHospital;
+  LocationResult? get userLocation => _userLocation;
+  List<DoctorProfile> get recentDoctors => _recentDoctors;
+  List<DoctorProfile> get nearbyDoctors => _nearbyDoctors;
+  List<HospitalProfile> get nearbyHospitals => _nearbyHospitals;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+  String get selectedSpecialty => _selectedSpecialty;
+  String get searchMode => _searchMode;
 
-  // Mock data for hospitals
-  static final List<Hospital> _mockHospitals = [
-    Hospital(
-      id: '1',
-      name: 'City General Hospital',
-      address: '123 Main St, Downtown',
-      distance: 2.3,
-      specialties: ['Cardiology', 'Neurology', 'General Medicine'],
-      rating: 4.8,
-      isAvailable: true,
-    ),
-    Hospital(
-      id: '2',
-      name: 'Medical Center East',
-      address: '456 Oak Ave, Eastside',
-      distance: 1.8,
-      specialties: ['Dermatology', 'Orthopedics', 'Pediatrics'],
-      rating: 4.6,
-      isAvailable: true,
-    ),
-    Hospital(
-      id: '3',
-      name: 'University Medical Center',
-      address: '789 University Blvd',
-      distance: 3.1,
-      specialties: ['Oncology', 'Surgery', 'Emergency Medicine'],
-      rating: 4.9,
-      isAvailable: true,
-    ),
-    Hospital(
-      id: '4',
-      name: 'Community Health Clinic',
-      address: '321 Community Dr',
-      distance: 0.8,
-      specialties: ['Family Medicine', 'General Practice'],
-      rating: 4.4,
-      isAvailable: true,
-    ),
-    Hospital(
-      id: '5',
-      name: 'Specialty Hospital',
-      address: '654 Specialty Way',
-      distance: 4.2,
-      specialties: ['Cardiology', 'Neurology', 'Surgery'],
-      rating: 4.7,
-      isAvailable: true,
-    ),
-  ];
+  // Set selected doctor
+  void setSelectedDoctor(DoctorProfile doctor) {
+    _selectedDoctor = doctor;
+    _selectedHospital = null; // Clear hospital selection
 
-  // Initialize with mock data
-  LocationController() {
-    _nearbyHospitals = List.from(_mockHospitals);
-    _recentHospitals = _mockHospitals.take(3).toList();
-  }
-
-  // Set selected hospital
-  void setSelectedHospital(Hospital hospital) {
-    _selectedHospital = hospital;
-    
-    // Add to recent hospitals if not already there
-    if (!_recentHospitals.any((h) => h.id == hospital.id)) {
-      _recentHospitals.insert(0, hospital);
-      if (_recentHospitals.length > 5) {
-        _recentHospitals.removeLast();
+    // Add to recent doctors if not already there
+    if (!_recentDoctors.any((d) => d.uid == doctor.uid)) {
+      _recentDoctors.insert(0, doctor);
+      if (_recentDoctors.length > 5) {
+        _recentDoctors.removeLast();
       }
     }
-    
+
     notifyListeners();
   }
 
+  // Set selected hospital
+  void setSelectedHospital(HospitalProfile hospital) {
+    _selectedHospital = hospital;
+    _selectedDoctor = null; // Clear doctor selection
+    notifyListeners();
+  }
+
+  // Set search mode
+  void setSearchMode(String mode) {
+    if (_searchMode != mode) {
+      _searchMode = mode;
+      _selectedDoctor = null;
+      _selectedHospital = null;
+      // Refresh results with new mode
+      if (_userLocation != null) {
+        refreshNearbyResults();
+      }
+      notifyListeners();
+    }
+  }
+
   // Set user location
-  void setUserLocation(String location) {
+  void setUserLocation(LocationResult location) {
     _userLocation = location;
     notifyListeners();
   }
 
-  // Use my location (GPS simulation)
+  // Set selected specialty for filtering
+  void setSelectedSpecialty(String specialty) {
+    _selectedSpecialty = specialty;
+    notifyListeners();
+  }
+
+  // Use my location (real GPS)
   Future<void> useMyLocation() async {
+    print('LocationController: Starting useMyLocation()...');
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Simulate GPS location fetch
-    await Future.delayed(const Duration(seconds: 2));
-    
-    _userLocation = 'Current Location';
-    _nearbyHospitals = List.from(_mockHospitals);
-    
-    // Sort by distance (simulate GPS-based sorting)
-    _nearbyHospitals.sort((a, b) => a.distance.compareTo(b.distance));
-    
+    try {
+      // Check if location services are available first
+      bool servicesEnabled = await LocationService.isLocationServiceEnabled();
+      if (!servicesEnabled) {
+        _errorMessage =
+            'Location services are disabled. Please enable GPS in your device settings.';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      // Get user's current location
+      LocationResult? location = await LocationService.getCurrentLocation();
+
+      if (location != null) {
+        print(
+          'LocationController: Got real location: ${location.latitude}, ${location.longitude}',
+        );
+        _userLocation = location;
+
+        // Get nearby doctors based on location
+        await _loadNearbyDoctors();
+      } else {
+        _errorMessage =
+            'Unable to get your location. Please check location permissions and try again.';
+        print('LocationController: Failed to get location, using fallback...');
+        // Fallback to mock location for demo
+        _userLocation = LocationService.getMockLocation();
+        await _loadNearbyDoctors();
+      }
+    } catch (e) {
+      print('LocationController: Exception during location fetch: $e');
+      _errorMessage =
+          'Error getting location: Please enable location services and permissions.';
+      // Fallback to mock location
+      _userLocation = LocationService.getMockLocation();
+      await _loadNearbyDoctors();
+    }
+
     _isLoading = false;
     notifyListeners();
   }
 
-  // Search hospitals
-  List<Hospital> searchHospitals(String query) {
-    if (query.isEmpty) return _nearbyHospitals;
-    
-    return _nearbyHospitals.where((hospital) {
-      final searchQuery = query.toLowerCase();
-      return hospital.name.toLowerCase().contains(searchQuery) ||
-             hospital.address.toLowerCase().contains(searchQuery) ||
-             hospital.specialties.any((specialty) => 
-               specialty.toLowerCase().contains(searchQuery));
-    }).toList();
+  // Load nearby doctors from Firebase
+  Future<void> _loadNearbyDoctors() async {
+    if (_userLocation == null) return;
+
+    try {
+      _nearbyDoctors = await LocationService.getNearbyDoctors(
+        userLatitude: _userLocation!.latitude,
+        userLongitude: _userLocation!.longitude,
+        specialty: _selectedSpecialty == 'All' ? null : _selectedSpecialty,
+      );
+    } catch (e) {
+      _errorMessage = 'Error loading nearby doctors: ${e.toString()}';
+      _nearbyDoctors = [];
+    }
   }
 
-  // Clear selected hospital
-  void clearSelectedHospital() {
-    _selectedHospital = null;
+  // Refresh nearby doctors with current filters
+  Future<void> refreshNearbyDoctors() async {
+    if (_userLocation == null) {
+      await useMyLocation();
+      return;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    await _loadNearbyDoctors();
+
+    _isLoading = false;
     notifyListeners();
   }
 
-  // Get hospital by ID
-  Hospital? getHospitalById(String id) {
+  // Load nearby hospitals from Firebase
+  Future<void> _loadNearbyHospitals() async {
+    if (_userLocation == null) return;
+
     try {
-      return _nearbyHospitals.firstWhere((hospital) => hospital.id == id);
+      _nearbyHospitals = await LocationService.getNearbyHospitals(
+        _userLocation!.latitude,
+        _userLocation!.longitude,
+        serviceFilter: _selectedSpecialty == 'All' ? null : _selectedSpecialty,
+      );
+    } catch (e) {
+      _errorMessage = 'Error loading nearby hospitals: ${e.toString()}';
+      _nearbyHospitals = [];
+    }
+  }
+
+  // Refresh nearby hospitals
+  Future<void> refreshNearbyHospitals() async {
+    if (_userLocation == null) {
+      await useMyLocation();
+      return;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    await _loadNearbyHospitals();
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Refresh nearby results based on current search mode
+  Future<void> refreshNearbyResults() async {
+    if (_searchMode == 'doctors') {
+      await refreshNearbyDoctors();
+    } else if (_searchMode == 'hospitals') {
+      await refreshNearbyHospitals();
+    } else if (_searchMode == 'both') {
+      // Refresh both in parallel
+      _isLoading = true;
+      notifyListeners();
+
+      await Future.wait([_loadNearbyDoctors(), _loadNearbyHospitals()]);
+
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Search doctors
+  List<DoctorProfile> searchDoctors(String query) {
+    if (query.isEmpty) return _nearbyDoctors;
+
+    return _nearbyDoctors.where((doctor) {
+      final searchQuery = query.toLowerCase();
+      return doctor.fullName.toLowerCase().contains(searchQuery) ||
+          doctor.clinicAddress.toLowerCase().contains(searchQuery) ||
+          doctor.specializations.any(
+            (specialty) => specialty.toLowerCase().contains(searchQuery),
+          ) ||
+          doctor.hospitalAffiliation.toLowerCase().contains(searchQuery);
+    }).toList();
+  }
+
+  // Filter doctors by specialty
+  Future<void> filterBySpecialty(String specialty) async {
+    _selectedSpecialty = specialty;
+
+    if (_userLocation != null) {
+      _isLoading = true;
+      notifyListeners();
+
+      await _loadNearbyDoctors();
+
+      _isLoading = false;
+    }
+
+    notifyListeners();
+  }
+
+  // Clear selected doctor
+  void clearSelectedDoctor() {
+    _selectedDoctor = null;
+    notifyListeners();
+  }
+
+  // Get doctor by ID
+  DoctorProfile? getDoctorById(String id) {
+    try {
+      return _nearbyDoctors.firstWhere((doctor) => doctor.uid == id);
     } catch (e) {
       return null;
     }
   }
 
-  // Get hospitals by specialty
-  List<Hospital> getHospitalsBySpecialty(String specialty) {
-    return _nearbyHospitals.where((hospital) => 
-      hospital.specialties.contains(specialty)).toList();
+  // Get doctors by specialty from current results
+  List<DoctorProfile> getDoctorsBySpecialty(String specialty) {
+    return _nearbyDoctors
+        .where((doctor) => doctor.specializations.contains(specialty))
+        .toList();
+  }
+
+  // Get distance to a specific doctor
+  double getDistanceToDoctor(DoctorProfile doctor) {
+    if (_userLocation == null) return double.infinity;
+
+    return LocationService.getDistanceToDoctor(
+      _userLocation!.latitude,
+      _userLocation!.longitude,
+      doctor,
+    );
   }
 
   // Get context string for AI chat
   String getLocationContext() {
-    if (_selectedHospital != null) {
-      return 'Hospital: ${_selectedHospital!.name} (${_selectedHospital!.distance}km away)';
+    if (_selectedDoctor != null) {
+      double distance = getDistanceToDoctor(_selectedDoctor!);
+      return 'Doctor: ${_selectedDoctor!.fullName} at ${_selectedDoctor!.hospitalAffiliation} '
+          '(${distance.toStringAsFixed(1)}km away)';
     } else if (_userLocation != null) {
-      return 'Location: $_userLocation';
+      return 'Location: ${_userLocation!.address}';
     }
     return 'No location selected';
   }
-} 
+
+  // Clear error message
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  // Check if location services are enabled
+  Future<bool> checkLocationServices() async {
+    return await LocationService.isLocationServiceEnabled();
+  }
+
+  // Open location settings
+  Future<void> openLocationSettings() async {
+    await LocationService.openLocationSettings();
+  }
+
+  // Open app settings for permissions
+  Future<void> openAppSettings() async {
+    await LocationService.openAppSettings();
+  }
+}

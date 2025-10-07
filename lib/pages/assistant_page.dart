@@ -6,7 +6,7 @@ import '../widgets/ai_suggestion_chip.dart';
 import '../widgets/ai_progress_tracker.dart';
 import '../widgets/enhanced_chat_bubble.dart';
 import '../widgets/enhanced_voice_button.dart';
-import '../widgets/hospital_selector.dart';
+import '../widgets/doctor_selector.dart';
 import '../controllers/location_controller.dart';
 import '../services/chat_service.dart';
 import '../services/doctor_matching_service.dart';
@@ -668,7 +668,7 @@ class _AssistantPageState extends State<AssistantPage> {
           AISuggestionChip(
             text: "Change location",
             icon: Icons.location_on,
-            onTap: () => _showHospitalSelector(),
+            onTap: () => _showDoctorSelector(),
           ),
         ];
       }
@@ -721,17 +721,17 @@ class _AssistantPageState extends State<AssistantPage> {
     }
   }
 
-  void _showHospitalSelector() {
+  void _showDoctorSelector() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) =>
-          HospitalSelectorModal(locationController: widget.locationController),
+          DoctorSelectorModal(locationController: widget.locationController),
     ).then((_) {
-      // Force UI update when returning from the hospital selector
+      // Force UI update when returning from the doctor selector
       setState(() {
-        // Just triggering a rebuild to refresh the hospital name
+        // Just triggering a rebuild to refresh the doctor name
       });
     });
   }
@@ -871,7 +871,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: GestureDetector(
-                    onTap: _showHospitalSelector,
+                    onTap: _showDoctorSelector,
                     child: Container(
                       width: double.infinity,
                       padding: EdgeInsets.symmetric(
