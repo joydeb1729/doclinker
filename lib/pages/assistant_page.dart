@@ -207,9 +207,170 @@ class _AssistantPageState extends State<AssistantPage> {
     _scrollToBottom();
   }
 
+  // Check if user message is medical/symptom-related or booking intent
+  bool _isMedicalOrBookingQuery(String message) {
+    final lowerMessage = message.toLowerCase();
+
+    // Medical symptoms keywords
+    const medicalKeywords = [
+      'pain',
+      'ache',
+      'hurt',
+      'sore',
+      'fever',
+      'cold',
+      'cough',
+      'headache',
+      'stomach',
+      'nausea',
+      'dizzy',
+      'tired',
+      'fatigue',
+      'sick',
+      'ill',
+      'disease',
+      'symptom',
+      'medicine',
+      'medication',
+      'treatment',
+      'diagnosis',
+      'doctor',
+      'chest',
+      'heart',
+      'blood',
+      'pressure',
+      'breathing',
+      'breath',
+      'lung',
+      'skin',
+      'rash',
+      'allergy',
+      'infection',
+      'swelling',
+      'broken',
+      'injury',
+      'emergency',
+      'urgent',
+      'serious',
+      'chronic',
+      'acute',
+      'severe',
+      'depression',
+      'anxiety',
+      'stress',
+      'mental',
+      'psychological',
+      'pregnancy',
+      'pregnant',
+      'baby',
+      'child',
+      'pediatric',
+      'eye',
+      'vision',
+      'ear',
+      'hearing',
+      'throat',
+      'nose',
+      'kidney',
+      'liver',
+      'diabetes',
+      'cancer',
+      'tumor',
+      'find doctor',
+      'need doctor',
+      'see doctor',
+      'consult',
+      'appointment',
+    ];
+
+    // Booking/appointment keywords
+    const bookingKeywords = [
+      'book',
+      'booking',
+      'appointment',
+      'schedule',
+      'reserve',
+      'visit',
+      'consult',
+      'consultation',
+      'meet',
+      'see doctor',
+    ];
+
+    // Check if message contains medical or booking keywords
+    for (final keyword in [...medicalKeywords, ...bookingKeywords]) {
+      if (lowerMessage.contains(keyword)) {
+        return true;
+      }
+    }
+
+    // Check for "I have/feel/experiencing" patterns
+    if (lowerMessage.startsWith('i have') ||
+        lowerMessage.startsWith('i feel') ||
+        lowerMessage.startsWith('i am experiencing') ||
+        lowerMessage.startsWith('my') ||
+        lowerMessage.contains('experiencing') ||
+        lowerMessage.contains('suffering from')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Generate intelligent response for non-medical queries in doctor mode
+  ChatMessage _generateDoctorModeRedirect() {
+    final redirectMessages = [
+      "This is Doctor Finding mode. I can help you find the right doctor for medical symptoms or book appointments. For general questions, please switch to Chat mode.",
+      "I'm in Doctor Finding mode and specialize in matching you with doctors based on your symptoms. For other questions, please use Chat mode.",
+      "In Doctor Finding mode, I focus on medical queries and doctor recommendations. For general assistance, please switch to Chat mode.",
+      "This mode is designed for medical consultation and doctor matching. For non-medical questions, please try Chat mode.",
+    ];
+
+    final randomMessage =
+        redirectMessages[DateTime.now().millisecond % redirectMessages.length];
+
+    return ChatMessage(
+      text: randomMessage,
+      isUser: false,
+      timestamp: DateTime.now(),
+      suggestions: [
+        AISuggestionChip(
+          text: "I have symptoms",
+          icon: Icons.sick,
+          onTap: () => _sendQuickMessage("I have symptoms to discuss"),
+        ),
+        AISuggestionChip(
+          text: "Find a doctor",
+          icon: Icons.search,
+          onTap: () => _sendQuickMessage("Help me find a doctor"),
+        ),
+        AISuggestionChip(
+          text: "Switch to Chat mode",
+          icon: Icons.chat,
+          onTap: () {
+            setState(() {
+              _currentMode = ChatMode.simpleChat;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
   // RAG-based doctor matching workflow
   Future<void> _handleDoctorMatching(String userMessage) async {
     try {
+      // First, check if this is actually a medical query
+      if (!_isMedicalOrBookingQuery(userMessage)) {
+        // Not a medical query - redirect user to chat mode
+        setState(() {
+          final redirectMessage = _generateDoctorModeRedirect();
+          _doctorMatchingMessages.add(redirectMessage);
+          _aiState = AIState.idle;
+        });
+        return;
+      }
+
       // Step 1: Analyze symptoms and get specialty recommendations
       setState(() {
         _currentStage = AIProgressStage.symptomAnalysis;
@@ -252,6 +413,7 @@ class _AssistantPageState extends State<AssistantPage> {
             specialties: specialtyRecommendation.specialties,
             location: locationContext,
             originalQuery: userMessage,
+            locationController: widget.locationController,
             maxResults: 3,
           );
 
@@ -531,16 +693,22 @@ class _AssistantPageState extends State<AssistantPage> {
 
             const SizedBox(height: 8),
 
-            // Details
+            // Hospital and Distance Info
             Row(
               children: [
-                Icon(Icons.star, color: Colors.amber, size: 16),
+                Icon(Icons.local_hospital, color: Colors.blue, size: 16),
                 const SizedBox(width: 4),
-                Text('${doctor.rating} (${doctor.reviewCount} reviews)'),
-                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    doctor.hospitalAffiliation,
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Icon(Icons.location_on, color: Colors.grey, size: 16),
                 const SizedBox(width: 4),
-                Text(doctor.distance),
+                Text(doctor.distance, style: const TextStyle(fontSize: 12)),
               ],
             ),
 
@@ -564,29 +732,16 @@ class _AssistantPageState extends State<AssistantPage> {
 
             const SizedBox(height: 12),
 
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _sendQuickMessage("Tell me more about ${doctor.name}");
-                    },
-                    child: const Text('View Details'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _initiateBooking(doctor);
-                    },
-                    child: const Text('Book Now'),
-                  ),
-                ),
-              ],
+            // Action button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _initiateBooking(doctor);
+                },
+                child: const Text('Book Now'),
+              ),
             ),
           ],
         ),

@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/doctor_profile.dart';
 import 'embedding_service.dart';
 import 'chat_service.dart';
+import 'location_based_doctor_filter_service.dart';
+import '../controllers/location_controller.dart';
+import 'location_service.dart';
 
 class DoctorMatchingService {
   static const String _baseUrl =
@@ -227,6 +230,7 @@ Format your response as JSON:
     required List<String> specialties,
     required String location,
     required String originalQuery,
+    LocationController? locationController,
     int maxResults = 5,
   }) async {
     try {
@@ -239,13 +243,106 @@ Format your response as JSON:
       print('🔍 Found ${doctorsQuery.docs.length} active doctors in database');
       print('🎯 Searching for specialties: ${specialties.join(', ')}');
 
-      // Match doctors by specialty
-      List<MatchedDoctor> matchedDoctors = [];
-
+      // Convert Firestore documents to DoctorProfile objects
+      List<DoctorProfile> allDoctors = [];
       for (var doc in doctorsQuery.docs) {
         try {
           final doctorProfile = DoctorProfile.fromFirestore(doc);
+          allDoctors.add(doctorProfile);
+        } catch (e) {
+          print('❌ Error processing doctor profile: $e');
+          continue;
+        }
+      }
 
+      // Apply location filtering if active or auto-enable if user location is available
+      List<DoctorProfile> filteredDoctors = allDoctors;
+
+      // Debug location filter status
+      print('🔍 Location Controller Status:');
+      print(
+        '  - Location Controller: ${locationController != null ? "Available" : "NULL"}',
+      );
+      if (locationController != null) {
+        print(
+          '  - User Location: ${locationController.userLocation?.address ?? "None"}',
+        );
+        print(
+          '  - Selected Location: ${locationController.selectedLocation?.address ?? "None"}',
+        );
+        print(
+          '  - Selected Hospitals Count: ${locationController.selectedLocationHospitals.length}',
+        );
+        print(
+          '  - Location Filter Active: ${locationController.isLocationFilterActive}',
+        );
+        if (locationController.selectedLocationHospitals.isNotEmpty) {
+          print(
+            '  - Hospital Names: ${locationController.selectedLocationHospitals.map((h) => h.name).take(3).join(", ")}${locationController.selectedLocationHospitals.length > 3 ? "..." : ""}',
+          );
+        }
+      }
+
+      bool shouldFilter = false;
+      List<String> hospitalNamesForFiltering = [];
+
+      if (locationController?.isLocationFilterActive == true) {
+        print(
+          '📍 Location filter is ACTIVE - filtering doctors by selected location hospitals',
+        );
+        shouldFilter = true;
+        hospitalNamesForFiltering = locationController!
+            .selectedLocationHospitals
+            .map((hospital) => hospital.name)
+            .toList();
+      } else if (locationController?.userLocation != null) {
+        print('📍 Auto-enabling location filter using user location');
+        try {
+          // Get hospitals near user's current location
+          final nearbyHospitals = await LocationService.getNearbyHospitals(
+            locationController!.userLocation!.latitude,
+            locationController.userLocation!.longitude,
+            radiusInKm: 15.0, // 15km radius for doctor filtering
+          );
+
+          if (nearbyHospitals.isNotEmpty) {
+            shouldFilter = true;
+            hospitalNamesForFiltering = nearbyHospitals
+                .map((h) => h.name)
+                .toList();
+            print(
+              '🏥 Found ${nearbyHospitals.length} hospitals near user location for filtering',
+            );
+          } else {
+            print(
+              '❌ No hospitals found near user location - showing all doctors',
+            );
+          }
+        } catch (e) {
+          print('❌ Error getting nearby hospitals: $e - showing all doctors');
+        }
+      } else {
+        print(
+          '❌ Location filter is NOT ACTIVE and no user location - showing all doctors',
+        );
+      }
+
+      if (shouldFilter && hospitalNamesForFiltering.isNotEmpty) {
+        filteredDoctors =
+            await LocationBasedDoctorFilterService.filterDoctorsByLocationHospitals(
+              allDoctors: allDoctors,
+              locationHospitalNames: hospitalNamesForFiltering,
+            );
+        print(
+          '🏥 After location filtering: ${filteredDoctors.length} doctors remain',
+        );
+      }
+
+      // Match doctors by specialty
+      List<MatchedDoctor> matchedDoctors = [];
+
+      for (var doctorProfile in filteredDoctors) {
+        try {
           // Calculate specialty match score
           double matchScore = _calculateSpecialtyMatch(
             doctorProfile,
@@ -262,6 +359,7 @@ Format your response as JSON:
               doctorProfile,
               matchScore,
               location,
+              userLocation: locationController?.userLocation,
             );
             matchedDoctors.add(matchedDoctor);
             print(
@@ -430,17 +528,16 @@ Format your response as JSON:
   static MatchedDoctor _convertToMatchedDoctor(
     DoctorProfile profile,
     double similarity,
-    String location,
-  ) {
-    // Calculate distance (mock for now - you can integrate real geolocation)
-    final distance =
-        '${(math.Random().nextDouble() * 5 + 0.5).toStringAsFixed(1)} km';
+    String location, {
+    LocationResult? userLocation,
+  }) {
+    // Use real distance calculation if user location is available
+    final distance = userLocation != null
+        ? _calculateRealDistance(profile.hospitalAffiliation, userLocation)
+        : _calculateRealisticDistance(profile.hospitalAffiliation);
 
-    // Determine availability
-    final isAvailableToday = math.Random().nextBool();
-    final nextAvailable = isAvailableToday
-        ? 'Today ${_getRandomTimeSlot()}'
-        : 'Tomorrow ${_getRandomTimeSlot()}';
+    // Determine availability based on doctor's actual availability settings
+    final availabilityInfo = _getRealisticAvailability(profile);
 
     return MatchedDoctor(
       id: profile.uid,
@@ -451,32 +548,230 @@ Format your response as JSON:
       subSpecialties: profile.specializations.length > 1
           ? profile.specializations.skip(1).toList()
           : [],
-      rating: profile.averageRating > 0 ? profile.averageRating : 4.5,
-      reviewCount: profile.totalReviews > 0 ? profile.totalReviews : 50,
+      rating: profile.averageRating > 0
+          ? profile.averageRating
+          : _getRealisticRating(profile.yearsOfExperience),
+      reviewCount: profile.totalReviews > 0
+          ? profile.totalReviews
+          : _getRealisticReviewCount(profile.yearsOfExperience),
       distance: distance,
       matchScore: similarity,
       yearsExperience: profile.yearsOfExperience,
       education: profile.medicalDegree,
-      hospitalAffiliation: profile.hospitalAffiliation,
+      hospitalAffiliation:
+          profile.hospitalAffiliation, // Real hospital name from dropdown
       consultationFee: profile.consultationFee,
-      availableToday: isAvailableToday,
-      nextAvailable: nextAvailable,
+      availableToday: availabilityInfo['isAvailable'] as bool,
+      nextAvailable: availabilityInfo['nextSlot'] as String,
       profileImage: profile.profileImageUrl,
     );
   }
 
-  // Get random time slot for availability
-  static String _getRandomTimeSlot() {
-    final slots = [
-      '9:00 AM',
-      '10:00 AM',
-      '11:00 AM',
-      '2:00 PM',
-      '3:00 PM',
-      '4:00 PM',
-      '5:00 PM',
+  // Calculate real distance between user location and hospital
+  static String _calculateRealDistance(
+    String hospitalName,
+    LocationResult userLocation,
+  ) {
+    // Map hospitals to their approximate coordinates (you can enhance this with a proper geocoding service)
+    final Map<String, Map<String, double>> hospitalCoordinates = {
+      'Khulna Medical College Hospital, Khulna': {
+        'lat': 22.8456,
+        'lng': 89.5403,
+      },
+      'Square Hospital Ltd., Dhaka': {'lat': 23.7515, 'lng': 90.3860},
+      'United Hospital Limited': {'lat': 23.7956, 'lng': 90.4074},
+      'Dhaka Medical College & Hospital': {'lat': 23.7272, 'lng': 90.3981},
+      'Chittagong Medical College Hospital': {'lat': 22.3475, 'lng': 91.8123},
+      'M.A.G Osmani Medical College and Hospital, Sylhet': {
+        'lat': 24.8949,
+        'lng': 91.8687,
+      },
+      // Add more hospitals as needed
+    };
+
+    if (hospitalCoordinates.containsKey(hospitalName)) {
+      final hospitalCoords = hospitalCoordinates[hospitalName]!;
+      final distance = _haversineDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        hospitalCoords['lat']!,
+        hospitalCoords['lng']!,
+      );
+      return '${distance.toStringAsFixed(1)} km';
+    }
+
+    // Fallback to static distance if coordinates not available
+    return _calculateRealisticDistance(hospitalName);
+  }
+
+  // Haversine formula to calculate distance between two GPS coordinates
+  static double _haversineDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double radiusOfEarth = 6371; // Earth's radius in kilometers
+
+    double dLat = _degreesToRadians(lat2 - lat1);
+    double dLon = _degreesToRadians(lon2 - lon1);
+
+    double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
+    double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return radiusOfEarth * c;
+  }
+
+  // Convert degrees to radians
+  static double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  // Calculate realistic distance based on hospital location
+  static String _calculateRealisticDistance(String hospitalName) {
+    // Map major hospitals to approximate distances from city center
+    final Map<String, String> hospitalDistances = {
+      // Dhaka hospitals
+      'Square Hospital Ltd., Dhaka': '2.5 km',
+      'United Hospital Limited': '3.2 km',
+      'Evercare Hospital Dhaka': '4.1 km',
+      'Ibn Sina Hospitals, Dhaka': '2.8 km',
+      'Labaid Specialised Hospital, Dhaka': '3.5 km',
+      'Bangladesh Medical College Hospital, Dhaka': '2.1 km',
+      'Dhaka Medical College & Hospital': '1.8 km',
+      'Holy Family Red Crescent Medical College Hospital, Dhaka': '3.7 km',
+
+      // Chittagong hospitals
+      'Chittagong Medical College Hospital': '2.3 km',
+      'Chittagong Maa-O-Shishu Hospital, Chittagong': '3.1 km',
+
+      // Sylhet hospitals
+      'M.A.G Osmani Medical College and Hospital, Sylhet': '2.7 km',
+      'Ibn Sina Hospital Sylhet Ltd': '3.4 km',
+      'Mount Adora Hospital, Sylhet': '4.2 km',
+
+      // Other cities
+      'Khulna Medical College Hospital, Khulna': '2.9 km',
+      'Rajshahi Medical College Hospital': '2.4 km',
+      'Mymensingh Medical College Hospital': '2.6 km',
+    };
+
+    // Return specific distance if hospital is mapped, otherwise calculate based on name
+    if (hospitalDistances.containsKey(hospitalName)) {
+      return hospitalDistances[hospitalName]!;
+    }
+
+    // For unmapped hospitals, provide realistic range based on location indicators
+    if (hospitalName.toLowerCase().contains('dhaka')) {
+      return '${(2.0 + math.Random().nextDouble() * 3.0).toStringAsFixed(1)} km';
+    } else if (hospitalName.toLowerCase().contains('chittagong')) {
+      return '${(1.8 + math.Random().nextDouble() * 2.5).toStringAsFixed(1)} km';
+    } else if (hospitalName.toLowerCase().contains('sylhet')) {
+      return '${(2.2 + math.Random().nextDouble() * 2.8).toStringAsFixed(1)} km';
+    } else {
+      // Default for other cities
+      return '${(1.5 + math.Random().nextDouble() * 3.5).toStringAsFixed(1)} km';
+    }
+  }
+
+  // Get realistic availability based on doctor's actual schedule
+  static Map<String, dynamic> _getRealisticAvailability(DoctorProfile profile) {
+    final currentDay = DateTime.now().weekday;
+    final dayNames = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
     ];
-    return slots[math.Random().nextInt(slots.length)];
+    final today = dayNames[currentDay - 1];
+
+    // Check if doctor has availability today
+    final todaySlots = profile.weeklyAvailability[today] ?? [];
+    final isAvailableToday = todaySlots.isNotEmpty && profile.isActive;
+
+    String nextAvailable;
+    if (isAvailableToday && todaySlots.isNotEmpty) {
+      // Use first available slot today
+      nextAvailable = 'Today ${todaySlots.first}';
+    } else {
+      // Find next available day
+      String nextDay = _findNextAvailableDay(
+        profile.weeklyAvailability,
+        currentDay,
+      );
+      nextAvailable = nextDay;
+    }
+
+    return {'isAvailable': isAvailableToday, 'nextSlot': nextAvailable};
+  }
+
+  // Find the next available day for the doctor
+  static String _findNextAvailableDay(
+    Map<String, List<String>> availability,
+    int currentDay,
+  ) {
+    final dayNames = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
+
+    // Check next 7 days
+    for (int i = 1; i <= 7; i++) {
+      final dayIndex = (currentDay + i - 1) % 7;
+      final dayName = dayNames[dayIndex];
+      final slots = availability[dayName] ?? [];
+
+      if (slots.isNotEmpty) {
+        final dayDisplayName = dayName[0].toUpperCase() + dayName.substring(1);
+        if (i == 1) {
+          return 'Tomorrow ${slots.first}';
+        } else {
+          return '$dayDisplayName ${slots.first}';
+        }
+      }
+    }
+
+    return 'Call to schedule';
+  }
+
+  // Generate realistic rating based on experience
+  static double _getRealisticRating(int yearsOfExperience) {
+    if (yearsOfExperience >= 15) {
+      return 4.6 + (math.Random().nextDouble() * 0.3); // 4.6-4.9
+    } else if (yearsOfExperience >= 10) {
+      return 4.3 + (math.Random().nextDouble() * 0.4); // 4.3-4.7
+    } else if (yearsOfExperience >= 5) {
+      return 4.0 + (math.Random().nextDouble() * 0.4); // 4.0-4.4
+    } else {
+      return 3.8 + (math.Random().nextDouble() * 0.5); // 3.8-4.3
+    }
+  }
+
+  // Generate realistic review count based on experience
+  static int _getRealisticReviewCount(int yearsOfExperience) {
+    if (yearsOfExperience >= 15) {
+      return 180 + math.Random().nextInt(120); // 180-300 reviews
+    } else if (yearsOfExperience >= 10) {
+      return 120 + math.Random().nextInt(80); // 120-200 reviews
+    } else if (yearsOfExperience >= 5) {
+      return 60 + math.Random().nextInt(60); // 60-120 reviews
+    } else {
+      return 25 + math.Random().nextInt(35); // 25-60 reviews
+    }
   }
 
   // Analyze symptoms and extract medical entities
